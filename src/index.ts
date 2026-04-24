@@ -1,0 +1,81 @@
+import Fastify from 'fastify';
+import cors from '@fastify/cors';
+import multipart from '@fastify/multipart';
+import jwt from '@fastify/jwt';
+import cookie from '@fastify/cookie';
+import { env } from './config';
+import { connectMongoDB } from './db/mongo/connection';
+import { routes } from './routes';
+import { authRoutes } from './routes/auth';
+import { userRoutes } from './routes/users';
+
+const fastify = Fastify({
+  logger: env.NODE_ENV === 'development',
+});
+
+fastify.setErrorHandler((error, request, reply) => {
+  const statusCode = typeof (error as any).statusCode === 'number' ? (error as any).statusCode : 500;
+  const requestId = (request as any).requestId || request.id;
+  const code = (error as any).code || (statusCode >= 500 ? 'INTERNAL_ERROR' : 'REQUEST_ERROR');
+
+  request.log.error({
+    requestId,
+    code,
+    statusCode,
+    message: error.message,
+    stack: statusCode >= 500 ? error.stack : undefined,
+  });
+
+  reply.code(statusCode).send({
+    error: {
+      code,
+      message: error.message || 'Unexpected error',
+      request_id: requestId,
+    },
+  });
+});
+
+fastify.setNotFoundHandler((request, reply) => {
+  const requestId = (request as any).requestId || request.id;
+  reply.code(404).send({
+    error: {
+      code: 'NOT_FOUND',
+      message: `Route ${request.method} ${request.url} not found`,
+      request_id: requestId,
+    },
+  });
+});
+
+async function start() {
+  try {
+    await fastify.register(cors, {
+      origin: true,
+    });
+
+    await fastify.register(multipart, {
+      limits: {
+        fileSize: 50 * 1024 * 1024,
+      },
+    });
+
+    await fastify.register(cookie);
+
+    await fastify.register(jwt, {
+      secret: env.JWT_SECRET,
+    });
+
+    await fastify.register(authRoutes);
+    await fastify.register(userRoutes);
+    await fastify.register(routes);
+
+    await connectMongoDB();
+    
+    await fastify.listen({ port: env.PORT, host: '0.0.0.0' });
+    console.log(`🚀 Server running on http://localhost:${env.PORT}`);
+  } catch (err) {
+    fastify.log.error(err);
+    process.exit(1);
+  }
+}
+
+start();

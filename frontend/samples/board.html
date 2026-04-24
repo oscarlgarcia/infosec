@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Board Style Demo</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+
+:root {
+
+--primary: #1E2954;
+--secondary: #2765C8;
+
+--cyan: #4CC7E8;
+--mint: #78E0B0;
+--purple: #6A3CE8;
+
+--bg: #FFFFFF;
+--surface: #F7F9FC;
+
+--text: #111827;
+--muted: #42526B;
+--border: #E5E7EB;
+
+}
+
+*{
+box-sizing:border-box;
+margin:0;
+padding:0;
+}
+
+body{
+
+font-family:Inter,system-ui;
+background:var(--bg);
+color:var(--text);
+
+}
+
+.container{
+max-width:1200px;
+margin:auto;
+padding:40px;
+}
+
+h1{
+font-size:48px;
+margin-bottom:16px;
+}
+
+h2{
+font-size:32px;
+margin-bottom:20px;
+}
+
+p{
+color:var(--muted);
+line-height:1.6;
+margin-bottom:20px;
+}
+
+.navbar{
+
+height:70px;
+border-bottom:1px solid var(--border);
+display:flex;
+align-items:center;
+justify-content:space-between;
+padding:0 40px;
+}
+
+.logo{
+
+font-weight:700;
+font-size:20px;
+color:var(--primary);
+
+}
+
+.nav-links a{
+
+margin-left:24px;
+color:var(--text);
+text-decoration:none;
+
+}
+
+.hero{
+
+padding:100px 40px;
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:60px;
+align-items:center;
+
+}
+
+.hero-visual{
+
+height:300px;
+border-radius:20px;
+
+background:linear-gradient(
+135deg,
+#203A78,
+#2765C8,
+#4CC7E8,
+#78E0B0
+);
+
+}
+
+.buttons{
+
+display:flex;
+gap:16px;
+margin-top:20px;
+
+}
+
+button{
+
+border:none;
+padding:14px 22px;
+border-radius:12px;
+font-weight:600;
+cursor:pointer;
+
+}
+
+.btn-primary{
+
+background:var(--primary);
+color:white;
+
+}
+
+.btn-secondary{
+
+background:white;
+border:1px solid var(--border);
+color:var(--primary);
+
+}
+
+.palette{
+
+display:grid;
+grid-template-columns:repeat(6,1fr);
+gap:16px;
+margin-top:40px;
+
+}
+
+.color-box{
+
+height:100px;
+border-radius:12px;
+display:flex;
+align-items:end;
+padding:10px;
+color:white;
+font-size:12px;
+font-weight:600;
+
+}
+
+.cards{
+
+display:grid;
+grid-template-columns:repeat(3,1fr);
+gap:24px;
+margin-top:60px;
+
+}
+
+.card{
+
+background:white;
+border-radius:16px;
+border:1px solid var(--border);
+padding:24px;
+box-shadow:0 10px 30px rgba(0,0,0,0.04);
+
+}
+
+.gradient-section{
+
+margin-top:100px;
+padding:80px;
+color:white;
+border-radius:20px;
+
+background:linear-gradient(
+135deg,
+#203A78,
+#2765C8,
+#4CC7E8
+);
+
+}
+
+footer{
+
+margin-top:80px;
+padding:40px;
+border-top:1px solid var(--border);
+text-align:center;
+color:var(--muted);
+
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="navbar">
+<div class="logo">Board Demo</div>
+
+<div class="nav-links">
+<a href="#">Solutions</a>
+<a href="#">Platform</a>
+<a href="#">Customers</a>
+<a href="#">Resources</a>
+</div>
+</div>
+
+
+<section class="hero container">
+
+<div>
+<h1>AI-powered planning platform</h1>
+
+<p>
+Example interface inspired by enterprise SaaS design.
+Clean layout, strong typography and modern color accents.
+</p>
+
+<div class="buttons">
+<button class="btn-primary">Get Demo</button>
+<button class="btn-secondary">Watch Demo</button>
+</div>
+
+</div>
+
+<div class="hero-visual"></div>
+
+</section>
+
+
+
+<section class="container">
+
+<h2>Color Palette</h2>
+
+<div class="palette">
+
+<div class="color-box" style="background:#1E2954">Primary</div>
+
+<div class="color-box" style="background:#2765C8">Secondary</div>
+
+<div class="color-box" style="background:#4CC7E8">Cyan</div>
+
+<div class="color-box" style="background:#78E0B0">Mint</div>
+
+<div class="color-box" style="background:#6A3CE8">Purple</div>
+
+<div class="color-box" style="background:#111827">Text</div>
+
+</div>
+
+</section>
+
+
+
+<section class="container">
+
+<h2>Feature Cards</h2>
+
+<div class="cards">
+
+<div class="card">
+<h3>Planning</h3>
+<p>Enterprise performance planning across finance and operations.</p>
+</div>
+
+<div class="card">
+<h3>Forecasting</h3>
+<p>AI-assisted forecasting with scenario simulation.</p>
+</div>
+
+<div class="card">
+<h3>Analytics</h3>
+<p>Real-time dashboards and decision intelligence.</p>
+</div>
+
+</div>
+
+</section>
+
+
+
+<section class="container">
+
+<div class="gradient-section">
+
+<h2>Enterprise AI Planning</h2>
+
+<p>
+Gradient sections like this are used for emphasis and visual energy
+in SaaS marketing pages.
+</p>
+
+<button class="btn-secondary">Learn More</button>
+
+</div>
+
+</section>
+
+
+<footer>
+Example SaaS layout inspired by Board style
+</footer>
+
+</body>
+</html>
