@@ -68,3 +68,17 @@ export async function rejectKbCandidate(id: string, reviewer: string, note?: str
   ).lean();
 }
 
+export async function createKbCandidate(input: {
+  question: string;
+  suggestedAnswer: string;
+  sessionId?: string;
+  clientId?: string;
+  domain?: string;
+  sourceRefs?: string[];
+}) {
+  return KbCandidate.create({
+    ...input,
+    status: 'draft',
+  });
+}
+

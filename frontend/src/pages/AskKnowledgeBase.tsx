@@ -34,6 +34,8 @@ export function AskKnowledgeBase() {
   const [viewRequestData, setViewRequestData] = useState<ClientRequest | null>(null);
   const [loading, setLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [addedMsgIds, setAddedMsgIds] = useState<Set<number>>(new Set());
+  const [addingMsgId, setAddingMsgId] = useState<number | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -49,6 +51,31 @@ export function AskKnowledgeBase() {
       setShowScrollButton(!isAtBottom);
     }
   }, []);
+
+  const handleAddMsgToKB = async (msg: Message, idx: number) => {
+    if (addedMsgIds.has(idx)) return;
+    setAddingMsgId(idx);
+    try {
+      const userMsg = messages.find((m, i) => i < idx && m.role === 'user');
+      const res = await apiFetch('/kb/candidates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question: userMsg?.content || 'From chat',
+          suggestedAnswer: msg.content,
+          sessionId: selectedChatId,
+          clientId: selectedClientId,
+        }),
+      });
+      if (res.ok) {
+        setAddedMsgIds(prev => new Set([...prev, idx]));
+      }
+    } catch (e) {
+      console.error('Failed to add to KB:', e);
+    } finally {
+      setAddingMsgId(null);
+    }
+  };
 
   useEffect(() => {
     scrollToBottom();
@@ -478,8 +505,20 @@ const chatContent = (
                 {messages.map((message, idx) => (
                   <div key={idx} className={`message ${message.role}`}>
                     <div className="message-content">{message.content}</div>
-                    <div className="message-time">
-                      {message.timestamp ? new Date(message.timestamp).toLocaleTimeString() : ''}
+                    <div className="message-footer">
+                      <div className="message-time">
+                        {message.timestamp ? new Date(message.timestamp).toLocaleTimeString() : ''}
+                      </div>
+                      {message.role === 'assistant' && (
+                        <button
+                          className={`msg-add-kb-btn ${addedMsgIds.has(idx) ? 'added' : ''}`}
+                          onClick={() => handleAddMsgToKB(message, idx)}
+                          disabled={addingMsgId === idx}
+                          title="Add to KB Candidates"
+                        >
+                          {addedMsgIds.has(idx) ? '✓' : '+'}
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}

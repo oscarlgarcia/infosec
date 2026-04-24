@@ -88,7 +88,7 @@ import crypto from 'crypto';
 import { runChatQuery } from '../services/rag/orchestrator';
 import { detectContradictions } from '../services/rag/contradictions';
 import { ingestDocument, ingestQaFile, ingestRulesFile } from '../services/ingestion/ingestion';
-import { createRule, deleteRule, listKbCandidates, listRules, rejectKbCandidate, updateRule, approveKbCandidate } from '../services/governance/governance';
+import { createRule, createKbCandidate, deleteRule, listKbCandidates, listRules, rejectKbCandidate, updateRule, approveKbCandidate } from '../services/governance/governance';
 import { getAnalyticsClientOverview, getAnalyticsCoverageGaps, getAnalyticsFreshness, getAnalyticsOpportunities, getAnalyticsOverview, getAnalyticsQuality, getAnalyticsQuestionClusters, getAnalyticsRecommendations, getAnalyticsTrends, recordResponseFeedback } from '../services/analytics/analytics';
 import { createAnswerBuilderJob, exportAnswerBuilderJobCsv, getAnswerBuilderJob, getAnswerBuilderQueueState } from '../services/answer-builder/jobs';
 import { parseQuestionnaireFile } from '../services/answer-builder/parser';
@@ -577,6 +577,19 @@ export async function routes(fastify: FastifyInstance) {
     async (request, reply) => {
       await deleteRule(request.params.id);
       return reply.code(204).send();
+    }
+  );
+
+  fastify.post<{ Body: { question: string; suggestedAnswer: string; sessionId?: string; clientId?: string; domain?: string; sourceRefs?: string[] } }>(
+    '/kb/candidates',
+    { preHandler: [verifyToken, requireRole('admin', 'manager', 'sme')] },
+    async (request, reply) => {
+      const { question, suggestedAnswer, sessionId, clientId, domain, sourceRefs } = request.body;
+      if (!question || !suggestedAnswer) {
+        return reply.code(400).send({ error: 'question and suggestedAnswer are required' });
+      }
+      const candidate = await createKbCandidate({ question, suggestedAnswer, sessionId, clientId, domain, sourceRefs });
+      return candidate;
     }
   );
 
@@ -1315,7 +1328,7 @@ fastify.get<{ Querystring: { q: string; topK?: number } }>(
   async (request, reply) => {
     try {
       const query = request.query.q || '';
-      const topK = parseInt(request.query.topK as string) || 50;
+      const topK = parseInt(request.query.topK as string) || 10000;
       
       if (!query || query.length < 2) {
         return reply.code(400).send({ error: 'Query is required (min 2 characters)' });

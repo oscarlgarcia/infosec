@@ -230,7 +230,7 @@ export const CanonicalAnswerSchema = new Schema({
 }, { timestamps: true });
 
 export const KbCandidateSchema = new Schema({
-  sessionId: { type: String, required: true, index: true },
+  sessionId: { type: String, index: true },
   clientId: { type: Schema.Types.ObjectId, ref: 'Client', index: true },
   question: { type: String, required: true },
   suggestedAnswer: { type: String, required: true },

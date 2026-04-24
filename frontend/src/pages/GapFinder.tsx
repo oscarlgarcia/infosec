@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Layout } from '../components/Layout';
 import { useApi } from '../contexts/AuthContext';
 import { useLanguage } from '../i18n/LanguageContext';
+import { Link } from 'react-router-dom';
 
 interface GapAnalysis {
   query: string;
@@ -14,11 +15,13 @@ interface GapAnalysis {
 interface GapItem {
   id: string;
   title: string;
-  source: 'qanda' | 'document';
+  source: 'qanda' | 'document' | 'cms' | 'faq';
   similarity: number;
   severity: 'high' | 'medium' | 'low';
   category?: string;
   department?: string;
+  action?: string;
+  actionType?: 'add-content' | 'add-qa';
 }
 
 interface CoverageMetrics {
@@ -43,11 +46,13 @@ const SAMPLE_QUERIES = [
 export function GapFinderPage() {
   const { language } = useLanguage();
   const apiFetch = useApi();
-  
+
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [analysis, setAnalysis] = useState<GapAnalysis | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [addingId, setAddingId] = useState<string | null>(null);
+  const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
 
   const t = (es: string, en: string) => language === 'es' ? es : en;
 
@@ -59,7 +64,7 @@ export function GapFinderPage() {
     setError(null);
     
     try {
-      const res = await apiFetch(`/gap-finder?q=${encodeURIComponent(finalQuery)}&topK=50`);
+      const res = await apiFetch(`/gap-finder?q=${encodeURIComponent(finalQuery)}`);
       
       if (res.ok) {
         const data = await res.json();
@@ -83,6 +88,30 @@ export function GapFinderPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     handleSearch();
+  };
+
+  const handleAddToKB = async (item: GapItem) => {
+    if (addedIds.has(item.id)) return;
+    setAddingId(item.id);
+    try {
+      const res = await apiFetch('/kb/candidates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question: item.title,
+          suggestedAnswer: `Suggested content for: ${item.title}`,
+          domain: item.category || 'general',
+          sourceRefs: [item.source],
+        }),
+      });
+      if (res.ok) {
+        setAddedIds(prev => new Set([...prev, item.id]));
+      }
+    } catch (e) {
+      console.error('Failed to add to KB:', e);
+    } finally {
+      setAddingId(null);
+    }
   };
 
   const getSeverityColor = (severity: string) => {
@@ -172,15 +201,16 @@ export function GapFinderPage() {
               <div className="gf-section">
                 <h3>
                   <span className="gf-section-icon strength">✓</span>
-                  {t('Strengths (', 'Fortalezas (')} {analysis.strengths.length}
+                  {t('Strengths', 'Fortalezas')} ({analysis.strengths.length})
                 </h3>
                 <div className="gf-items-list">
                   {analysis.strengths.map((item) => (
                     <div key={item.id} className="gf-item strength-item">
                       <span className="gf-item-title">{item.title}</span>
-                      <span className="gf-item-meta">
-                        {item.source} • {Math.round(item.similarity * 100)}% match
-                      </span>
+                      <div className="gf-item-details">
+                        <span className="gf-item-source">{item.source}</span>
+                        <span className="gf-item-similarity">{Math.round(item.similarity * 100)}% match</span>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -191,7 +221,7 @@ export function GapFinderPage() {
               <div className="gf-section">
                 <h3>
                   <span className="gf-section-icon gap">⚠</span>
-                  {t('Gaps Detected (', 'Gaps Detectados (')} {analysis.gapsFound.length}
+                  {t('Gaps Detected', 'Gaps Detectados')} ({analysis.gapsFound.length})
                 </h3>
                 
                 <div className="gf-severity-summary">
@@ -214,10 +244,10 @@ export function GapFinderPage() {
 
                 <div className="gf-items-list">
                   {analysis.gapsFound.map((item) => (
-                    <div 
-                      key={item.id} 
+                    <div
+                      key={item.id}
                       className="gf-item gap-item"
-                      style={{ 
+                      style={{
                         borderLeftColor: getSeverityColor(item.severity),
                         backgroundColor: getSeverityBg(item.severity)
                       }}
@@ -229,6 +259,20 @@ export function GapFinderPage() {
                           {item.severity.toUpperCase()}
                         </span>
                         {item.category && <span className="gf-item-category">{item.category}</span>}
+                      </div>
+                      <div className="gf-item-actions">
+                        {addedIds.has(item.id) ? (
+                          <span className="gf-added-badge">✓ Added</span>
+                        ) : (
+                          <button
+                            className="gf-add-kb-btn"
+                            onClick={() => handleAddToKB(item)}
+                            disabled={addingId === item.id}
+                            title="Add to KB Candidates"
+                          >
+                            {addingId === item.id ? '...' : '+'} Add to KB
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}
