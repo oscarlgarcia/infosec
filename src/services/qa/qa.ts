@@ -1,5 +1,6 @@
 import { QAEntry } from '../../db/mongo/models';
 import { createOllamaEmbedding } from '../llm/openai';
+import { getChromaClient } from '../chroma/indexer';
 
 type Department = 'Cloud' | 'IT' | 'Development' | 'Compliance' | 'Legal';
 
@@ -346,6 +347,8 @@ export async function importQAText(content: string, source: string = 'import'): 
   
   console.log(`🔄 Importing ${parsed.length} Q&A entries with embeddings...`);
   
+  const chromaEntries: Array<{ id: string; text: string; question: string; answer: string; domain: string }> = [];
+  
   for (const qa of parsed) {
     let embeddingStatus: 'generated' | 'failed' | 'pending' = 'pending';
     let embedding: number[] | null = null;
@@ -358,7 +361,7 @@ export async function importQAText(content: string, source: string = 'import'): 
       embeddingStatus = 'failed';
     }
     
-    await QAEntry.create({
+    const entry = await QAEntry.create({
       questionNumber: qa.questionNumber || undefined,
       question: qa.question,
       answer: qa.answer,
@@ -369,8 +372,51 @@ export async function importQAText(content: string, source: string = 'import'): 
     });
     imported++;
     
+    if (embedding && embedding.length > 0) {
+      chromaEntries.push({
+        id: entry._id.toString(),
+        text: `${qa.question} ${qa.answer}`.trim(),
+        question: qa.question,
+        answer: qa.answer,
+        domain: resolveInfoSecDomain(qa.questionNumber, qa.infoSecDomain) || 'general',
+      });
+    }
+    
     if (imported % 20 === 0) {
       console.log(`✅ Imported ${imported}/${parsed.length} entries`);
+    }
+  }
+  
+  if (chromaEntries.length > 0) {
+    console.log(`🔄 Indexing ${chromaEntries.length} entries in ChromaDB...`);
+    try {
+      const client = await getChromaClient();
+      const collection = await client.getOrCreateCollection({ name: 'qanda' });
+      
+      for (const entry of chromaEntries) {
+        try {
+          const emb = await createOllamaEmbedding(entry.text);
+          if (emb.length > 0) {
+            await collection.add({
+              ids: [entry.id],
+              embeddings: [emb],
+              documents: [entry.text],
+              metadatas: [{
+                question: entry.question,
+                answer: entry.answer,
+                department: '',
+                category: entry.domain,
+                source: 'qa'
+              }]
+            });
+          }
+        } catch (err) {
+          console.error(`❌ Failed to index in Chroma: ${entry.question.substring(0, 30)}...`);
+        }
+      }
+      console.log(`✅ Indexed ${chromaEntries.length} entries in ChromaDB`);
+    } catch (err) {
+      console.error('❌ Failed to index entries in ChromaDB:', err);
     }
   }
   
@@ -406,4 +452,63 @@ export async function getQAById(id: string): Promise<QA | null> {
     createdAt: entry.createdAt,
     updatedAt: entry.updatedAt,
   };
+}
+
+export async function reindexQAEntriesToChroma(): Promise<{ success: number; failed: number }> {
+  const entries = await QAEntry.find({}).lean() as any[];
+  console.log(`🔄 Re-indexing ${entries.length} QA entries to ChromaDB...`);
+  
+  const client = await getChromaClient();
+  
+  try {
+    await client.deleteCollection({ name: 'qanda' });
+    console.log('🗑️ Cleared qanda collection');
+  } catch (e) {
+    console.log('ℹ️ qanda collection did not exist');
+  }
+  
+  const collection = await client.getOrCreateCollection({ name: 'qanda' });
+  
+  let success = 0;
+  let failed = 0;
+  
+  for (const entry of entries) {
+    try {
+      const text = `${entry.question || ''} ${entry.answer || ''}`.trim();
+      if (text.length < 5) {
+        failed++;
+        continue;
+      }
+      
+      const embedding = await createOllamaEmbedding(text);
+      if (embedding.length === 0) {
+        failed++;
+        continue;
+      }
+      
+      await collection.add({
+        ids: [entry._id.toString()],
+        embeddings: [embedding],
+        documents: [text],
+        metadatas: [{
+          question: entry.question || '',
+          answer: entry.answer || '',
+          department: entry.department || '',
+          category: entry.infoSecDomain || '',
+          source: 'qa'
+        }]
+      });
+      
+      success++;
+      if (success % 20 === 0) {
+        console.log(`✅ Indexed ${success}/${entries.length}`);
+      }
+    } catch (err) {
+      console.error(`❌ Failed to index ${entry._id}:`, err);
+      failed++;
+    }
+  }
+  
+  console.log(`✅ Re-index complete: ${success} success, ${failed} failed`);
+  return { success, failed };
 }

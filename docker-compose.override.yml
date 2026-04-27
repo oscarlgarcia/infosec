@@ -1,0 +1,16 @@
+# Docker Compose override for automatic setup
+# Usage: docker compose -f docker-compose.yml -f docker-compose.override.yml up -d
+
+services:
+  backend:
+    # Run setup script before starting the main process
+    command: sh -c "node scripts/setup-env.js && npm run dev"
+    depends_on:
+      mongo:
+        condition: service_healthy
+      chroma:
+        condition: service_started
+
+  ollama:
+    profiles:
+      - with-ollama  # Only start if explicitly requested: docker compose --profile with-ollama up -d

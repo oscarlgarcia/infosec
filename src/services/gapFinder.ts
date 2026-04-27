@@ -47,8 +47,8 @@ interface CoverageMetrics {
 }
 
 function determineSeverity(similarity: number): GapItem['severity'] {
-  if (similarity > 0.85) return 'low';
-  if (similarity > 0.6) return 'medium';
+  if (similarity >= 0.8) return 'low';
+  if (similarity >= 0.5) return 'medium';
   return 'high';
 }
 
@@ -85,58 +85,93 @@ export async function analyzeGap(query: string, topK: number = 10000): Promise<G
   
   for (const collectionName of collections) {
     try {
-      const collection = await client.getCollection({ name: collectionName });
+      const collection = await client.getOrCreateCollection({ name: collectionName });
       
-      const results = await collection.query({
-        queryEmbeddings: [queryEmbedding],
-        nResults: topK,
-        include: ['metadatas', 'documents', 'distances']
-      });
+      // Skip empty collections (newly created or no data)
+      const count = await collection.count();
+      console.log(`[GapFinder] Collection ${collectionName}: ${count} documents`);
+      
+      if (count === 0) {
+        console.log(`[GapFinder] Collection ${collectionName} is empty, skipping...`);
+        continue;
+      }
+      
+      console.log(`[GapFinder] Querying collection ${collectionName}...`);
+      
+      let results;
+      try {
+        results = await collection.query({
+          queryEmbeddings: [queryEmbedding],
+          nResults: topK,
+          include: ['metadatas', 'documents', 'distances']
+        });
+        
+      console.log(`[GapFinder] Query results from ${collectionName}: ids=${results.ids?.[0]?.length || 0}, docs=${results.documents?.[0]?.length || 0}, dist=${results.distances?.[0]?.length || 0}`);
+      if (results.distances?.[0]?.length > 0) {
+        console.log(`[GapFinder] Sample distances:`, results.distances[0].slice(0, 5));
+      }
+      } catch (queryError) {
+        console.error(`[GapFinder] Query failed for ${collectionName}:`, queryError);
+        continue;
+      }
       
       const ids = results.ids[0] || [];
       const documents = results.documents[0] || [];
       const metadatas = results.metadatas[0] || [];
       const distances = results.distances[0] || [];
       
-      questionsAnalyzed += ids.length;
-      
-      for (let i = 0; i < ids.length; i++) {
-        const id = ids[i];
-        const doc = documents[i] || '';
-        const metadata = metadatas[i] || {};
-        const distance = distances[i] ?? 500;
-        
-        const MAX_DISTANCE = 500;
-        const similarity = 1 - Math.min(1, distance / MAX_DISTANCE);
-        
-        const category = metadata.category || metadata.source || 'General';
-        categoryCount[category] = (categoryCount[category] || 0) + 1;
-        
-        if (similarity > 0.1) {
-          topicsCovered++;
-        }
-        
-        const title = metadata.title || metadata.question || doc.substring(0, 30) || id;
-        
-        const actionInfo = generateAction({ id, title, similarity, severity: determineSeverity(similarity) });
-        
-        const item: GapItem = {
-          id,
-          title,
-          source: (metadata.source || collectionName) as GapItem['source'],
-          similarity: Math.round(similarity * 100) / 100,
-          severity: determineSeverity(similarity),
-          category,
-          department: metadata.department,
-          ...actionInfo
-        };
-        
-        if (similarity > 0.2) {
-          strengths.push(item);
-        } else {
-          gaps.push(item);
-        }
-      }
+      questionsAnalyzed += ids.length;  // Count ALL documents returned by ChromaDB
+       
+       for (let i = 0; i < ids.length; i++) {
+         const id = ids[i];
+         const doc = documents[i] || '';
+         const metadata = metadatas[i] || {};
+          const distance = distances[i] ?? 2;
+          
+          // ChromaDB with cosine space returns cosine SIMILARITY (0-1), not distance!
+          // The values are already similarities, NOT distances
+          const similarity = distance; // Use directly, don't convert
+          
+          // UNDERSTANDING: If it was cosine DISTANCE (0-2), we'd use: 1 - distance/2
+          // But ChromaDB cosine space returns similarities where:
+          //   1.0 = identical, 0.8 = very similar, 0.5 = somewhat related, 0.1 = not related
+          
+          // Debug: log first 5 similarities
+          if (i < 5) {
+            console.log(`[GapFinder] ${collectionName} - id:${id}, raw_value:${distance}, used_as_similarity:${similarity}`);
+          }
+          
+          // Skip items with very low similarity (not relevant to query)
+          if (similarity < 0.1) continue;
+         
+         const category = metadata.category || metadata.source || 'General';
+         categoryCount[category] = (categoryCount[category] || 0) + 1;
+         
+         if (similarity >= 0.5) {
+           topicsCovered++;
+         }
+         
+         const title = metadata.title || metadata.question || doc.substring(0, 30) || id;
+         
+         const actionInfo = generateAction({ id, title, similarity, severity: determineSeverity(similarity) });
+         
+         const item: GapItem = {
+           id,
+           title,
+           source: (metadata.source || collectionName) as GapItem['source'],
+           similarity: Math.round(similarity * 100) / 100,
+           severity: determineSeverity(similarity),
+           category,
+           department: metadata.department,
+           ...actionInfo
+         };
+         
+         if (similarity >= 0.5) {
+           strengths.push(item);
+         } else if (similarity >= 0.1) {
+           gaps.push(item);
+         }
+       }
     } catch (error) {
       console.warn(`Collection ${collectionName} not found or error:`, error);
     }
@@ -153,7 +188,7 @@ export async function analyzeGap(query: string, topK: number = 10000): Promise<G
     : 0;
   
   const metrics: CoverageMetrics = {
-    questionsAnalyzed: relevantDocs,
+    questionsAnalyzed: questionsAnalyzed,  // Total documents returned by ChromaDB (168)
     topicsCovered: strengths.length,
     gapsDetected: gaps.length,
     highSeverity: gaps.filter(g => g.severity === 'high').length,

@@ -118,7 +118,22 @@ export function AskKnowledgeBase() {
       if (!res.ok) throw new Error(`Error fetching clients: ${res.status}`);
       const data = await res.json();
       setClients(data);
-      if (data.length > 0 && !selectedClientId) {
+      // If no clients, create a default one
+      if (data.length === 0 && !selectedClientId) {
+        const createRes = await apiFetch('/clients', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: 'Default Client',
+            clientType: 'Cloud'  // Must be valid enum: 'Cloud', 'Rent', 'PS'
+          })
+        });
+        if (createRes.ok) {
+          const newClient = await createRes.json();
+          setClients([newClient]);
+          setSelectedClientId(newClient.id);
+        }
+      } else if (data.length > 0 && !selectedClientId) {
         setSelectedClientId(data[0].id);
       }
     } catch (err) {
@@ -202,8 +217,8 @@ const handleCreateRequest = async (clientId: string, data: { requestType: string
     }
   };
 
-const handleNewChat = async () => {
-    if (!selectedClientId || !selectedRequestId) return;
+  const handleNewChat = async () => {
+    if (!selectedClientId) return; // Need at least a client
     try {
       const res = await apiFetch('/conversations', {
         method: 'POST',

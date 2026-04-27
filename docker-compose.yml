@@ -9,6 +9,11 @@ services:
       - mongo_data:/data/db
     networks:
       - infosec
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   chroma:
     image: chromadb/chroma:latest
@@ -21,6 +26,19 @@ services:
     networks:
       - infosec
       - llm-network
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: infosec-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - llm-network
+    environment:
+      - OLLAMA_HOST=0.0.0.0
 
   backend:
     build:
@@ -62,6 +80,7 @@ volumes:
   backend_node_modules:
   frontend_node_modules:
   backend_uploads:
+  ollama_data:
 
 networks:
   infosec:

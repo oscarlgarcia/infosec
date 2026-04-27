@@ -16,6 +16,7 @@ import {
   importQAText,
   exportQAText,
   semanticSearchQA,
+  reindexQAEntriesToChroma,
 } from '../services/qa/qa';
 import {
   addKnowledgeBookmark,
@@ -88,7 +89,7 @@ import crypto from 'crypto';
 import { runChatQuery } from '../services/rag/orchestrator';
 import { detectContradictions } from '../services/rag/contradictions';
 import { ingestDocument, ingestQaFile, ingestRulesFile } from '../services/ingestion/ingestion';
-import { createRule, createKbCandidate, deleteRule, listKbCandidates, listRules, rejectKbCandidate, updateRule, approveKbCandidate } from '../services/governance/governance';
+import { createRule, createKbCandidate, deleteRule, listKbCandidates, listRules, rejectKbCandidate, updateRule, approveKbCandidate, updateKbCandidate } from '../services/governance/governance';
 import { getAnalyticsClientOverview, getAnalyticsCoverageGaps, getAnalyticsFreshness, getAnalyticsOpportunities, getAnalyticsOverview, getAnalyticsQuality, getAnalyticsQuestionClusters, getAnalyticsRecommendations, getAnalyticsTrends, recordResponseFeedback } from '../services/analytics/analytics';
 import { createAnswerBuilderJob, exportAnswerBuilderJobCsv, getAnswerBuilderJob, getAnswerBuilderQueueState } from '../services/answer-builder/jobs';
 import { parseQuestionnaireFile } from '../services/answer-builder/parser';
@@ -96,6 +97,7 @@ import { applyRetentionPolicy, refreshDocumentFreshnessScores } from '../service
 import { ResponseTrace, ClientRequest } from '../db/mongo/models';
 
 export async function routes(fastify: FastifyInstance) {
+  console.log('[Routes] Loading routes...');
   fastify.addHook('onRequest', async (request, reply) => {
     const incoming = request.headers['x-request-id'];
     const requestId = Array.isArray(incoming) ? incoming[0] : incoming;
@@ -392,12 +394,12 @@ export async function routes(fastify: FastifyInstance) {
   );
 
 // Conversations - all authenticated users
-  fastify.post<{ Body: { clientId: string; title?: string; agent?: string; requestId?: string } }>(
+  fastify.post<{ Body: { clientId?: string; title?: string; agent?: string; requestId?: string } }>(
     '/conversations',
     { preHandler: [verifyToken] },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { clientId, title, agent, requestId } = request.body;
-      const conversation = await createConversation(clientId, title, agent, requestId);
+      const conversation = await createConversation(clientId || 'default', title, agent, requestId);
       return reply.code(201).send(conversation);
     }
   );
@@ -590,6 +592,16 @@ export async function routes(fastify: FastifyInstance) {
       }
       const candidate = await createKbCandidate({ question, suggestedAnswer, sessionId, clientId, domain, sourceRefs });
       return candidate;
+    }
+  );
+
+  fastify.put<{ Params: { id: string }; Body: { question?: string; suggestedAnswer?: string; domain?: string } }>(
+    '/kb/candidates/:id',
+    { preHandler: [verifyToken, requireRole('admin', 'manager', 'sme')] },
+    async (request, reply) => {
+      const updated = await updateKbCandidate(request.params.id, request.body);
+      if (!updated) return reply.code(404).send({ error: 'Candidate not found' });
+      return updated;
     }
   );
 
@@ -899,11 +911,20 @@ export async function routes(fastify: FastifyInstance) {
     }
   );
 
-  fastify.get('/qa/export',
+fastify.get('/qa/export',
     { preHandler: [verifyToken, requireRole('admin', 'manager', 'sme')] },
     async () => {
-      const content = await exportQAText();
+      const content = await exportQAtext();
       return content;
+    }
+  );
+
+  fastify.post(
+    '/qa/reindex',
+    { preHandler: [verifyToken, requireRole('admin', 'manager', 'sme')] },
+    async (request, reply) => {
+      const result = await reindexQAEntriesToChroma();
+      return result;
     }
   );
 

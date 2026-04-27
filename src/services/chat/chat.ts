@@ -247,6 +247,20 @@ export async function cleanAllData(): Promise<void> {
 }
 
 export async function createConversation(clientId: string, title?: string, agent?: string, requestId?: string): Promise<ConversationType> {
+  // Handle 'default' clientId - create default client if needed
+  if (clientId === 'default') {
+    let defaultClient = await Client.findOne({ name: 'Default Client' });
+    if (!defaultClient) {
+      defaultClient = await Client.create({
+        name: 'Default Client',
+        clientType: 'Cloud',  // Must be valid enum: 'Cloud', 'Rent', 'PS'
+        country: 'US',
+        contact: 'admin@example.com'
+      });
+    }
+    clientId = defaultClient._id.toString();
+  }
+  
   const conversation = await Conversation.create({
     clientId: new mongoose.Types.ObjectId(clientId),
     requestId: requestId ? new mongoose.Types.ObjectId(requestId) : undefined,
