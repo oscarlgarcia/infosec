@@ -1,7 +1,7 @@
 import { Client, QAEntry, CanonicalAnswer, SessionSummary, ResponseTrace, AnalyticsEvent, QuestionCoverage, DocumentUsage, GapBacklog, KbCandidate, AnswerRule } from '../../db/mongo/models';
 import { env } from '../../config';
 import { generateWithResponses, chat } from '../llm/openai';
-import { searchUnifiedKnowledgeBase } from '../kb/knowledge-base';
+import { retrieveRelevantPassages } from './retriever';
 import { newId, hashQuestion } from '../../utils/ids';
 import { detectContradictions } from './contradictions';
 
@@ -122,28 +122,23 @@ export async function runChatQuery(input: ChatQueryInput): Promise<ChatQueryOutp
     domain: input.domain || { $exists: true },
   }).limit(20).lean();
 
-  const kbResults = await searchUnifiedKnowledgeBase({
+  // Retrieve relevant passages from all ChromaDB collections (documents, Q&A, CMS, FAQ)
+  const retrievedPassages = await retrieveRelevantPassages({
     query: input.question,
-    limit: 6,
+    limit: 10,
   });
-
-  const qaMatches = await QAEntry.find({
-    question: { $regex: input.question.split(' ').slice(0, 3).join('|'), $options: 'i' },
-  }).limit(3).lean();
-
+  
   const canonicalMatch = canonicalCandidates.find((item: any) =>
     input.question.toLowerCase().includes(String(item.question || '').toLowerCase().slice(0, 40))
   );
-
-  const passages: string[] = [];
-  for (const result of kbResults.results.slice(0, 4)) {
-    passages.push(`${result.title} (${result.metadata.sourceLabel}): ${result.snippet || result.content.slice(0, 250)}`);
-  }
-  for (const qa of qaMatches) {
-    passages.push(`Q&A: ${qa.question} -> ${qa.answer.slice(0, 260)}`);
-  }
+  
+  const passages: string[] = retrievedPassages.map((p, i) => 
+    `[${p.sourceType.toUpperCase()} ${i + 1}] ${p.title}: ${p.content}`
+  );
+  
+  // Add canonical answer if found
   if (canonicalMatch) {
-    passages.push(`Canonical answer: ${(canonicalMatch as any).currentAnswer.slice(0, 260)}`);
+    passages.push(`[CANONICAL] ${(canonicalMatch as any).currentAnswer.slice(0, 300)}`);
   }
 
   const instructions = buildInstructions({
@@ -205,17 +200,17 @@ export async function runChatQuery(input: ChatQueryInput): Promise<ChatQueryOutp
     answerText = 'No answer could be generated with sufficient evidence.';
   }
 
-  const usedSources = kbResults.results.slice(0, 6).map((item) => ({
-    sourceType: item.sourceType,
-    itemId: item.id,
-    title: item.title,
-    score: item.score,
+  const usedSources = retrievedPassages.slice(0, 8).map((p) => ({
+    sourceType: p.sourceType,
+    itemId: p.itemId,
+    title: p.title,
+    score: p.score,
     version: undefined as string | undefined,
-    updatedAt: item.metadata.updatedAt,
+    updatedAt: undefined as Date | undefined,
   }));
 
-  const topScore = kbResults.results[0]?.score || 0;
-  const evidenceCount = kbResults.results.length + qaMatches.length + (canonicalMatch ? 1 : 0);
+  const topScore = retrievedPassages[0]?.score || 0;
+  const evidenceCount = retrievedPassages.length + (canonicalMatch ? 1 : 0);
   const contradictionReport = await detectContradictions({
     question: input.question,
     domain: input.domain,
