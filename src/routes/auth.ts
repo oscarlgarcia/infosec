@@ -15,6 +15,7 @@ interface RefreshBody {
 }
 
 export async function authRoutes(fastify: FastifyInstance) {
+  console.log('[AuthRoutes] Registering auth routes...');
   fastify.post<{ Body: LoginBody }>(
     '/auth/login',
     async (request: FastifyRequest<{ Body: LoginBody }>, reply: FastifyReply) => {

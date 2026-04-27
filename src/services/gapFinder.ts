@@ -57,7 +57,7 @@ function generateAction(item: GapItem): { action: string; actionType: 'add-conte
     { action: 'Añadir contenido detallado sobre este tema', actionType: 'add-content' },
     { action: 'Crear Q&A sobre: ' + item.title, actionType: 'add-qa' },
   ];
-  
+
   if (item.similarity < 0.3) {
     return { action: 'Añadir contenido completo sobre "' + item.title + '"', actionType: 'add-content' };
   }
@@ -98,22 +98,18 @@ export async function analyzeGap(query: string, topK: number = 10000): Promise<G
       
       console.log(`[GapFinder] Querying collection ${collectionName}...`);
       
-      let results;
-      try {
-        results = await collection.query({
-          queryEmbeddings: [queryEmbedding],
-          nResults: topK,
-          include: ['metadatas', 'documents', 'distances']
-        });
-        
-      console.log(`[GapFinder] Query results from ${collectionName}: ids=${results.ids?.[0]?.length || 0}, docs=${results.documents?.[0]?.length || 0}, dist=${results.distances?.[0]?.length || 0}`);
-      if (results.distances?.[0]?.length > 0) {
-        console.log(`[GapFinder] Sample distances:`, results.distances[0].slice(0, 5));
-      }
-      } catch (queryError) {
-        console.error(`[GapFinder] Query failed for ${collectionName}:`, queryError);
-        continue;
-      }
+      const results = await collection.query({
+        queryEmbeddings: [queryEmbedding],
+        nResults: topK,
+        include: ['metadatas', 'documents', 'distances']
+      });
+      
+      console.log(`[GapFinder] Query results from ${collectionName}:`, {
+        idsCount: results.ids?.[0]?.length || 0,
+        docsCount: results.documents?.[0]?.length || 0,
+        distancesCount: results.distances?.[0]?.length || 0,
+        sampleDistances: results.distances?.[0]?.slice(0, 5) || []
+      });
       
       const ids = results.ids[0] || [];
       const documents = results.documents[0] || [];
@@ -121,57 +117,81 @@ export async function analyzeGap(query: string, topK: number = 10000): Promise<G
       const distances = results.distances[0] || [];
       
       questionsAnalyzed += ids.length;  // Count ALL documents returned by ChromaDB
-       
-       for (let i = 0; i < ids.length; i++) {
-         const id = ids[i];
-         const doc = documents[i] || '';
-         const metadata = metadatas[i] || {};
-          const distance = distances[i] ?? 2;
-          
-          // ChromaDB with cosine space returns cosine SIMILARITY (0-1), not distance!
-          // The values are already similarities, NOT distances
-          const similarity = distance; // Use directly, don't convert
-          
-          // UNDERSTANDING: If it was cosine DISTANCE (0-2), we'd use: 1 - distance/2
-          // But ChromaDB cosine space returns similarities where:
-          //   1.0 = identical, 0.8 = very similar, 0.5 = somewhat related, 0.1 = not related
-          
-          // Debug: log first 5 similarities
-          if (i < 5) {
-            console.log(`[GapFinder] ${collectionName} - id:${id}, raw_value:${distance}, used_as_similarity:${similarity}`);
+      
+      // Debug: Count distribution of similarities
+      let debugCounts = { high: 0, medium: 0, low: 0, skipped: 0 };
+      
+      for (let i = 0; i < ids.length; i++) {
+        const id = ids[i];
+        const doc = documents[i] || '';
+        const metadata = metadatas[i] || {};
+        const distance = distances[i] ?? 2;
+        
+        // ChromaDB with cosine space returns cosine DISTANCE (1 - similarity), NOT similarity!
+        // Values might be returned as scaled percentages (335.6128 or 33.561)
+        let distanceValue = distance;
+        
+        // First: convert scaled values to normalized distance (0-1)
+        if (distanceValue > 1) {
+          // Could be percentage (33.561) OR percentage×10 (335.6128)
+          if (distanceValue > 100) {
+            distanceValue = distanceValue / 1000;  // 335.6128 → 0.33561 (distance)
+          } else {
+            distanceValue = distanceValue / 100;   // 33.561 → 0.33561 (distance)
           }
-          
-          // Skip items with very low similarity (not relevant to query)
-          if (similarity < 0.1) continue;
-         
-         const category = metadata.category || metadata.source || 'General';
-         categoryCount[category] = (categoryCount[category] || 0) + 1;
-         
-         if (similarity >= 0.5) {
-           topicsCovered++;
-         }
-         
-         const title = metadata.title || metadata.question || doc.substring(0, 30) || id;
-         
-         const actionInfo = generateAction({ id, title, similarity, severity: determineSeverity(similarity) });
-         
-         const item: GapItem = {
-           id,
-           title,
-           source: (metadata.source || collectionName) as GapItem['source'],
-           similarity: Math.round(similarity * 100) / 100,
-           severity: determineSeverity(similarity),
-           category,
-           department: metadata.department,
-           ...actionInfo
-         };
-         
-         if (similarity >= 0.5) {
-           strengths.push(item);
-         } else if (similarity >= 0.1) {
-           gaps.push(item);
-         }
-       }
+        }
+        
+        // Second: convert distance to similarity: similarity = 1 - distance
+        let similarity = 1 - distanceValue;
+        
+        // Ensure valid range 0-1
+        if (similarity < 0) similarity = 0;
+        if (similarity > 1) similarity = 1;
+        // Debug: log first 10 similarities
+        if (i < 10) {
+          console.log(`[GapFinder] ${collectionName} - id:${id}, similarity:${similarity} (raw:${distance}), title:${metadata.title || metadata.question || doc.substring(0, 20)}`);
+        }
+        
+        // Count distribution
+        if (similarity < 0.1) debugCounts.skipped++;
+        else if (similarity < 0.5) debugCounts.high++;
+        else if (similarity < 0.8) debugCounts.medium++;
+        else debugCounts.low++;
+        
+        // Skip items with very low similarity (not relevant to query)
+        if (similarity < 0.1) continue;
+        
+        const category = metadata.category || metadata.source || 'General';
+        categoryCount[category] = (categoryCount[category] || 0) + 1;
+        
+        if (similarity >= 0.5) {
+          topicsCovered++;
+        }
+        
+        const title = metadata.title || metadata.question || doc.substring(0, 30) || id;
+        
+        const actionInfo = generateAction({ id, title, similarity, severity: determineSeverity(similarity) });
+        
+        const item: GapItem = {
+          id,
+          title,
+          source: (metadata.source || collectionName) as GapItem['source'],
+          similarity: Math.round(similarity * 100) / 100,
+          severity: determineSeverity(similarity),
+          category,
+          department: metadata.department,
+          ...actionInfo
+        };
+        
+        if (similarity >= 0.5) {
+          strengths.push(item);
+        } else if (similarity >= 0.1) {
+          gaps.push(item);
+        }
+      }
+      
+      console.log(`[GapFinder] ${collectionName} summary: total=${ids.length}, gaps=${gaps.length}, strengths=${strengths.length}, dist=${JSON.stringify(debugCounts)}`);
+      
     } catch (error) {
       console.warn(`Collection ${collectionName} not found or error:`, error);
     }
@@ -200,6 +220,8 @@ export async function analyzeGap(query: string, topK: number = 10000): Promise<G
     )
   };
   
+  console.log(`[GapFinder] FINAL RESULT: query="${query}", coverage=${coverage}%, gaps=${gapsSorted.length}, strengths=${strengths.slice(0, 10).length}, metrics=`, JSON.stringify(metrics));
+
   return {
     query,
     coverage,

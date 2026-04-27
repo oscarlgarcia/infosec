@@ -66,9 +66,18 @@ async function start() {
 
     await fastify.register(authRoutes);
     await fastify.register(userRoutes);
-    await fastify.register(routes);
+    try {
+      await fastify.register(routes);
+      console.log('[Routes] Routes loaded successfully');
+    } catch (routeError) {
+      console.error('[Routes] ERROR loading routes:', routeError);
+      throw routeError;
+    }
 
     await connectMongoDB();
+    
+    // Test route
+    fastify.get('/api/test', async () => ({ status: 'ok', time: new Date().toISOString() }));
     
     await fastify.listen({ port: env.PORT, host: '0.0.0.0' });
     console.log(`🚀 Server running on http://localhost:${env.PORT}`);
