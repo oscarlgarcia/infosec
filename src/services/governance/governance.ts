@@ -2,25 +2,37 @@ import { AnswerRule, CanonicalAnswer, KbCandidate, QAEntry } from '../../db/mong
 import { createOllamaEmbedding } from '../llm/openai';
 import { getChromaClient } from '../chroma/indexer';
 
-export async function createRule(input: { name: string; content: string; domain?: string; enabled?: boolean }) {
+export async function createRule(input: { name: string; content: string; domain?: string; enabled?: boolean; appliesTo?: string[] }) {
   return AnswerRule.create({
     name: input.name,
     content: input.content,
     domain: input.domain,
+    appliesTo: input.appliesTo || [],  // NEW
     enabled: input.enabled ?? true,
     version: 1,
   });
 }
 
-export async function listRules() {
-  return AnswerRule.find().sort({ updatedAt: -1 }).lean();
+export async function listRules(agentName?: string) {
+  const query: any = {};
+  
+  if (agentName) {
+    query.$or = [
+      { appliesTo: { $in: [agentName] } },
+      { appliesTo: { $exists: false } },
+      { appliesTo: { $size: 0 } }
+    ];
+  }
+  
+  return AnswerRule.find(query).sort({ updatedAt: -1 }).lean();
 }
 
-export async function updateRule(id: string, input: Partial<{ name: string; content: string; domain: string; enabled: boolean }>) {
+export async function updateRule(id: string, input: Partial<{ name: string; content: string; domain: string; enabled: boolean; appliesTo?: string[] }>) {
   const current = await AnswerRule.findById(id);
   if (!current) return null;
 
   const nextVersion = input.content && input.content !== current.content ? current.version + 1 : current.version;
+  
   return AnswerRule.findByIdAndUpdate(id, { ...input, version: nextVersion }, { new: true }).lean();
 }
 

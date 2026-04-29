@@ -122,7 +122,14 @@ export async function runChatQuery(input: ChatQueryInput): Promise<ChatQueryOutp
   const intent = classifyIntent(input.question);
 
   const sessionSummary = await SessionSummary.findOne({ sessionId }).lean();
-  const rules = await AnswerRule.find({ enabled: true }).sort({ updatedAt: -1 }).limit(12).lean();
+  const rules = await AnswerRule.find({
+    enabled: true,
+    $or: [
+      { appliesTo: { $in: [args.agentName] } },
+      { appliesTo: { $exists: false } },
+      { appliesTo: { $size: 0 } }
+    ]
+  }).sort({ updatedAt: -1 }).limit(12).lean();
   const canonicalCandidates = await CanonicalAnswer.find({
     status: 'approved',
     domain: input.domain || { $exists: true },

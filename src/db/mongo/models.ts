@@ -206,6 +206,7 @@ export const AnswerRuleSchema = new Schema({
   name: { type: String, required: true },
   content: { type: String, required: true },
   domain: { type: String },
+  appliesTo: [{ type: String }],  // NEW: Agent names this rule applies to (empty = all agents)
   enabled: { type: Boolean, default: true },
   version: { type: Number, default: 1 },
 }, { timestamps: true });

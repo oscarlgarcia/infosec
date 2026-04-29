@@ -551,11 +551,12 @@ export async function routes(fastify: FastifyInstance) {
     }
   );
 
-  fastify.get('/rules', { preHandler: [verifyToken] }, async () => {
-    return listRules();
+  fastify.get('/rules', { preHandler: [verifyToken] }, async (request) => {
+    const agentName = (request.query as any).agent;
+    return listRules(agentName);
   });
 
-  fastify.post<{ Body: { name: string; content: string; domain?: string; enabled?: boolean } }>(
+  fastify.post<{ Body: { name: string; content: string; domain?: string; enabled?: boolean; appliesTo?: string[] } }>(
     '/rules',
     { preHandler: [verifyToken, requireRole('admin', 'manager', 'sme')] },
     async (request, reply) => {
@@ -564,7 +565,7 @@ export async function routes(fastify: FastifyInstance) {
     }
   );
 
-  fastify.put<{ Params: { id: string }; Body: { name?: string; content?: string; domain?: string; enabled?: boolean } }>(
+  fastify.put<{ Params: { id: string }; Body: { name?: string; content?: string; domain?: string; enabled?: boolean; appliesTo?: string[] } }>(
     '/rules/:id',
     { preHandler: [verifyToken, requireRole('admin', 'manager', 'sme')] },
     async (request, reply) => {
