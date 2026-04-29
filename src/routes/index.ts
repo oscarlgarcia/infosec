@@ -1364,7 +1364,7 @@ fastify.get<{ Querystring: { q: string; topK?: number } }>(
     }
   }
 );
-}
 
-// Agent routes
-fastify.register(agentRoutes);
+  // Agent routes
+  fastify.register(agentRoutes);
+}
