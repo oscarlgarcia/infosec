@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useApi } from '../contexts/AuthContext';
+import { useLanguage } from '../i18n/LanguageContext';
+import { Link } from 'react-router-dom';
 import type { Agent, AnswerRule } from '../types';
 
 interface AgentModalProps {
@@ -9,6 +11,7 @@ interface AgentModalProps {
 }
 
 export function AgentModal({ agent, onSave, onClose }: AgentModalProps) {
+  const { language } = useLanguage();
   const [name, setName] = useState(agent?.name || '');
   const [displayName, setDisplayName] = useState(agent?.displayName || '');
   const [description, setDescription] = useState(agent?.description || '');
