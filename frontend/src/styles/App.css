@@ -3825,3 +3825,111 @@ body {
   font-size: 14px;
   margin-top: 8px;
 }
+
+/* Settings Page Styles */
+.settings-page {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.settings-title {
+  font-size: 28px;
+  color: var(--primary);
+  margin-bottom: 30px;
+}
+
+.settings-section {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.settings-section-title {
+  font-size: 18px;
+  color: var(--text);
+  margin: 0 0 16px 0;
+}
+
+.language-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.lang-option {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.lang-option.active {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.toggle-switch {
+  position: relative;
+  width: 50px;
+  height: 26px;
+  background: var(--gray-200);
+  border: none;
+  border-radius: 13px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+
+.toggle-slider.right {
+  transform: translateX(24px);
+}
+
+.language-description {
+  color: var(--muted);
+  font-size: 14px;
+  margin: 0;
+}
+
+.settings-link {
+  display: inline-block;
+  background: var(--primary);
+  color: white;
+  padding: 10px 20px;
+  border-radius: 6px;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+
+.settings-link:hover {
+  background: var(--secondary);
+}
+
+.settings-description {
+  color: var(--muted);
+  font-size: 14px;
+  margin-top: 8px;
+}
+
+.reindex-msg {
+  margin-top: 12px;
+  padding: 10px 16px;
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14px;
+}
