@@ -3744,3 +3744,84 @@ body {
 .gf-action-link:hover {
   background: var(--primary-dark, #1d4ed8);
 }
+/* Agents Configurator Styles */
+.agents-configurator {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.agents-configurator .page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.back-link {
+  color: var(--secondary);
+  text-decoration: none;
+}
+
+.create-btn {
+  background: var(--primary);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.agents-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+}
+
+.agents-table th {
+  background: var(--surface);
+  padding: 12px;
+  text-align: left;
+}
+
+.agents-table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.badge-system {
+  background: var(--purple);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.btn-edit {
+  background: var(--secondary);
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-delete {
+  background: #DC2626;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.settings-link {
+  display: inline-block;
+  margin-top: 10px;
+}
+
+.settings-description {
+  color: var(--muted);
+  font-size: 14px;
+  margin-top: 8px;
+}
