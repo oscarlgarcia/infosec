@@ -23,6 +23,7 @@ import { ContradictionAnalyzerPage } from './pages/ContradictionAnalyzer'
 import { KbCandidatesPage } from './pages/KbCandidates'
 import { KnowledgeGraphPage } from './pages/KnowledgeGraph'
 import { GapFinderPage } from './pages/GapFinder'
+import { AgentsConfigurator } from './pages/AgentsConfigurator'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
@@ -149,6 +150,14 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
               element={
                 <ProtectedRoute>
                   <GapFinderPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/agents-configurator"
+              element={
+                <ProtectedRoute>
+                  <AgentsConfigurator />
                 </ProtectedRoute>
               }
             />

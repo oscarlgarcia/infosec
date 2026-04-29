@@ -2,6 +2,7 @@ import { Client, QAEntry, CanonicalAnswer, SessionSummary, ResponseTrace, Analyt
 import { env } from '../../config';
 import { generateWithResponses, chat } from '../llm/openai';
 import { retrieveRelevantPassages } from './retriever';
+import { getAgentByName } from '../agents/agent.service';
 import { newId, hashQuestion } from '../../utils/ids';
 import { detectContradictions } from './contradictions';
 
@@ -83,24 +84,29 @@ function computeStalenessPenalty(sources: Array<{ updatedAt?: Date }>): number {
   return Number(Math.min(0.25, staleSources.length / Math.max(1, sources.length) * 0.25).toFixed(2));
 }
 
-function buildInstructions(args: {
-  taskProfile?: string;
-  expectedFormat?: string;
+async function buildInstructions(args: {
+  agentName?: string;  // NUEVO: nombre del agente
+  query: string;
   sessionSummary: string;
   rules: string[];
   passages: string[];
-}): string {
-  const rulesBlock = args.rules.length > 0 ? args.rules.map((r, i) => `${i + 1}. ${r}`).join('\n') : 'No additional rules.';
-  const passagesBlock = args.passages.length > 0 ? args.passages.map((p, i) => `[PASSAGE ${i + 1}] ${p}`).join('\n\n') : 'No passages recovered.';
-
-  return [
-    'You are an InfoSec assistant. Respond with evidence and avoid unsupported claims.',
-    `Task profile: ${args.taskProfile || 'General infosec support.'}`,
-    `Session summary: ${args.sessionSummary || 'No previous summary.'}`,
-    `Response format: ${args.expectedFormat || 'Short answer + evidence bullets.'}`,
-    `Rules:\n${rulesBlock}`,
-    `Recovered passages:\n${passagesBlock}`,
-  ].join('\n\n');
+}): Promise<string> {
+  
+  // Obtener instrucciones del agente desde la BD
+  let agent = await getAgentByName(args.agentName || 'InfoSec');
+  
+  // Si no existe, usar InfoSec por defecto
+  if (!agent) {
+    agent = await getAgentByName('InfoSec');
+  }
+  
+  // Reemplazar placeholders en el template del agente
+  return agent!.instructions
+    .replace(/\{\{query\}\}/g, args.query)
+    .replace(/\{\{sessionSummary\}\}/g, args.sessionSummary || 'No previous summary.')
+    .replace(/\{\{rules\}\}/g, args.rules.join('\n') || 'No rules.')
+    .replace(/\{\{passages\}\}/g, args.passages.join('\n\n') || 'No passages recovered.')
+    .replace(/\{\{metrics\}\}/g, 'Metrics not available yet.'); // Placeholder para futuro
 }
 
 export async function runChatQuery(input: ChatQueryInput): Promise<ChatQueryOutput> {
@@ -141,9 +147,9 @@ export async function runChatQuery(input: ChatQueryInput): Promise<ChatQueryOutp
     passages.push(`[CANONICAL] ${(canonicalMatch as any).currentAnswer.slice(0, 300)}`);
   }
 
-  const instructions = buildInstructions({
-    taskProfile: input.taskProfile,
-    expectedFormat: input.expectedFormat,
+  const instructions = await buildInstructions({
+    agentName: input.agent,  // NUEVO: pasar el nombre del agente
+    query: input.question,
     sessionSummary: (sessionSummary as any)?.summaryText || '',
     rules: rules.map((rule: any) => rule.content),
     passages,

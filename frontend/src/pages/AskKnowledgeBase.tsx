@@ -8,18 +8,17 @@ import { Layout } from '../components/Layout';
 import { useApi, API_URL } from '../contexts/AuthContext';
 import '../styles/App.css';
 
-const AGENTS: Agent[] = ['Standard', 'InfoSec', 'Compliance', 'IT', 'Cloud', 'Legal', 'Dev', 'Gap Analysis'];
-
 export function AskKnowledgeBase() {
   const { language, t } = useLanguage();
   const apiFetch = useApi();
   const [clients, setClients] = useState<Client[]>([]);
+  const [agents, setAgents] = useState<Agent[]>([]);  // NUEVO: carga dinámica
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [requests, setRequests] = useState<ClientRequest[]>([]);
   const [selectedRequestId, setSelectedRequestId] = useState<string>('');
   const [chats, setChats] = useState<Chat[]>([]);
   const [selectedChatId, setSelectedChatId] = useState<string>('');
-  const [selectedAgent, setSelectedAgent] = useState<Agent>('InfoSec');
+  const [selectedAgent, setSelectedAgent] = useState<Agent>('InfoSec');  // Cambio: ahora es string (nombre)
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
@@ -39,6 +38,26 @@ export function AskKnowledgeBase() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+
+  // NUEVO: Cargar agents desde la API
+  useEffect(() => {
+    const loadAgents = async () => {
+      try {
+        const res = await apiFetch('/agents');
+        if (res.ok) {
+          const data = await res.json();
+          setAgents(data);
+          // Seleccionar el primer agente por defecto
+          if (data.length > 0 && !selectedAgent) {
+            setSelectedAgent(data[0].name);
+          }
+        }
+      } catch (err) {
+        console.error('Error loading agents:', err);
+      }
+    };
+    loadAgents();
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -320,7 +339,7 @@ const handleCreateRequest = async (clientId: string, data: { requestType: string
       const res = await apiFetch(`/conversations/${selectedChatId}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: inputValue, agent: selectedAgent }),
+        body: JSON.stringify({ message: inputValue, agent: selectedAgent }),  // NUEVO: envía selectedAgent (string)
       });
       if (!res.ok) throw new Error(`Error sending message: ${res.status}`);
       const data = await res.json();
@@ -559,12 +578,15 @@ const chatContent = (
             <div className="chat-input-container">
               <div className="chat-input-header">
                 <select
-                  className="agent-selector-inline"
+                  className="agent-selector-in-line"
                   value={selectedAgent}
                   onChange={(e) => setSelectedAgent(e.target.value as Agent)}
                 >
-                  {AGENTS.map(agent => (
-                    <option key={agent} value={agent}>{agent}</option>
+                  {agents.map(agent => (
+                    <option key={agent._id} value={agent.name}>
+                      {agent.displayName || agent.name}
+                      {agent.isSystem ? ' (System)' : ''}
+                    </option>
                   ))}
                 </select>
               </div>

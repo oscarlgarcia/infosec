@@ -61,23 +61,23 @@ import {
   getPopularContent
 } from '../services/cms/cms';
 import { 
-  createClient,
-  getAllClients,
-  getClient,
-  updateClient,
-  deleteClient,
+  createClient, 
+  getAllClients, 
+  getClient, 
+  updateClient, 
+  deleteClient, 
   createConversation, 
   getConversation, 
   getClientConversations, 
-  sendMessage,
-  deleteConversation,
-  updateConversation,
-  uploadClientAttachment,
-  getClientRequests,
-  createClientRequest,
-  getClientRequest,
-  updateClientRequest,
-  deleteClientRequest,
+  sendMessage, 
+  deleteConversation, 
+  updateConversation, 
+  uploadClientAttachment, 
+  getClientRequests, 
+  createClientRequest, 
+  getClientRequest, 
+  updateClientRequest, 
+  deleteClientRequest, 
   cleanAllData
 } from '../services/chat/chat';
 import { QAEntry } from '../db/mongo/models';
@@ -95,6 +95,7 @@ import { createAnswerBuilderJob, exportAnswerBuilderJobCsv, getAnswerBuilderJob,
 import { parseQuestionnaireFile } from '../services/answer-builder/parser';
 import { applyRetentionPolicy, refreshDocumentFreshnessScores } from '../services/ops/maintenance';
 import { ResponseTrace, ClientRequest } from '../db/mongo/models';
+import { agentRoutes } from './agent.routes';
 
 export async function routes(fastify: FastifyInstance) {
   console.log('[Routes] Loading routes...');
@@ -1364,3 +1365,6 @@ fastify.get<{ Querystring: { q: string; topK?: number } }>(
   }
 );
 }
+
+// Agent routes
+fastify.register(agentRoutes);

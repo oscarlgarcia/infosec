@@ -73,8 +73,17 @@ async function start() {
       console.error('[Routes] ERROR loading routes:', routeError);
       throw routeError;
     }
-
+    
     await connectMongoDB();
+    
+    // Initialize system agents
+    try {
+      const { initializeSystemAgents } = await import('./services/agents/agent.service');
+      await initializeSystemAgents();
+      console.log('✅ System agents initialized');
+    } catch (agentError) {
+      console.error('❌ Error initializing agents:', agentError);
+    }
     
     // Test route
     fastify.get('/api/test', async () => ({ status: 'ok', time: new Date().toISOString() }));
