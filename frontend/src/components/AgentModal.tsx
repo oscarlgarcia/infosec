@@ -148,7 +148,7 @@ Metrics: {{metrics}}`;
           )}
 
           <div className="modal-actions">
-            <button type="submit" className="agents-link" style={{ border: 'none', cursor: 'pointer' }}>
+            <button type="submit" className="agents-link" style={{ border: 'none', cursor: agent?.isSystem ? 'not-allowed' : 'pointer' }} disabled={!!agent?.isSystem}>
               {agent ? 'Update' : 'Create'}
             </button>
             <button type="button" className="settings-link" onClick={onClose} style={{ border: 'none', cursor: 'pointer' }}>

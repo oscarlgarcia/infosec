@@ -68,6 +68,11 @@ export function AgentsConfigurator() {
   const handleSave = async (data: Partial<Agent>) => {
     try {
       if (editingAgent) {
+        // Double-check: cannot modify system agents
+        if (editingAgent.isSystem) {
+          alert(language === 'es' ? 'No se pueden editar los agentes del sistema' : 'Cannot edit system agents');
+          return;
+        }
         const res = await apiFetch(`/agents/${editingAgent._id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
