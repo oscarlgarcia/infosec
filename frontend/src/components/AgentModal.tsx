@@ -109,10 +109,10 @@ Metrics: {{metrics}}`;
           </div>
 
           <div className="modal-actions">
-            <button type="submit" className="btn-primary">
+            <button type="submit" className="agents-link" style={{ border: 'none', cursor: 'pointer' }}>
               {agent ? 'Update' : 'Create'}
             </button>
-            <button type="button" className="btn-secondary" onClick={onClose}>
+            <button type="button" className="settings-link" onClick={onClose} style={{ border: 'none', cursor: 'pointer' }}>
               Cancel
             </button>
           </div>

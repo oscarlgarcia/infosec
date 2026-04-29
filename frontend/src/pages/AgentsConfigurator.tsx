@@ -101,7 +101,7 @@ export function AgentsConfigurator() {
         {error && <div className="error-message">{error}</div>}
 
         <div className="header-actions">
-          <button className="create-btn" onClick={handleCreateNew}>
+          <button className="agents-link" onClick={handleCreateNew} style={{ border: 'none', cursor: 'pointer' }}>
             + {language === 'es' ? 'Crear Agente' : 'Create Agent'}
           </button>
         </div>

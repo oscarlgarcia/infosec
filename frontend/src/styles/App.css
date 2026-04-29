@@ -3933,3 +3933,24 @@ body {
   color: var(--text);
   font-size: 14px;
 }
+
+/* Agents Link Style - identical to settings-link */
+.agents-link {
+  display: inline-block;
+  background: var(--primary);
+  color: white;
+  padding: 10px 20px;
+  border-radius: 6px;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+
+.agents-link:hover {
+  background: var(--secondary);
+}
+
+.agents-link:visited {
+  color: white;
+}
