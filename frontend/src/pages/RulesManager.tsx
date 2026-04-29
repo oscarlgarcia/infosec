@@ -124,51 +124,53 @@ export function RulesManager() {
         {loading ? (
           <div className="loading">{language === 'es' ? 'Cargando...' : 'Loading...'}</div>
         ) : (
-          <table className="agents-table">
-            <thead>
-              <tr>
-                <th>{language === 'es' ? 'Nombre' : 'Name'}</th>
-                <th>{language === 'es' ? 'Dominio' : 'Domain'}</th>
-                <th>{language === 'es' ? 'Aplica a' : 'Applies To'}</th>
-                <th>{language === 'es' ? 'Estado' : 'Status'}</th>
-                <th>{language === 'es' ? 'Acciones' : 'Actions'}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rules.map(rule => (
-                <tr key={(rule as any)._id || rule._id}>
-                  <td>
-                    <strong>{(rule as any).name || rule.name}</strong>
-                  </td>
-                  <td>{(rule as any).domain || rule.domain || '-'}</td>
-                  <td style={{ fontSize: '13px' }}>
-                    {getAgentDisplayNames(rule)}
-                  </td>
-                  <td>
-                    {(rule as any).enabled ?? rule.enabled ? (
-                      <span className="badge-system">{language === 'es' ? 'Habilitada' : 'Enabled'}</span>
-                    ) : (
-                      <span className="badge-inactive">{language === 'es' ? 'Deshabilitada' : 'Disabled'}</span>
-                    )}
-                  </td>
-                  <td className="actions-cell">
-                    <button 
-                      className="btn-edit"
-                      onClick={() => handleEdit(rule)}
-                    >
-                      {language === 'es' ? 'Editar' : 'Edit'}
-                    </button>
-                    <button 
-                      className="btn-delete"
-                      onClick={() => handleDelete(rule)}
-                    >
-                      {language === 'es' ? 'Eliminar' : 'Delete'}
-                    </button>
-                  </td>
+          <div className="table-container">
+            <table className="agents-table">
+              <thead>
+                <tr>
+                  <th>{language === 'es' ? 'Nombre' : 'Name'}</th>
+                  <th>{language === 'es' ? 'Dominio' : 'Domain'}</th>
+                  <th>{language === 'es' ? 'Aplica a' : 'Applies To'}</th>
+                  <th>{language === 'es' ? 'Estado' : 'Status'}</th>
+                  <th>{language === 'es' ? 'Acciones' : 'Actions'}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {rules.map(rule => (
+                  <tr key={(rule as any)._id || rule._id}>
+                    <td>
+                      <strong>{(rule as any).name || rule.name}</strong>
+                    </td>
+                    <td>{(rule as any).domain || rule.domain || '-'}</td>
+                    <td style={{ fontSize: '13px' }}>
+                      {getAgentDisplayNames(rule)}
+                    </td>
+                    <td>
+                      {(rule as any).enabled ?? rule.enabled ? (
+                        <span className="badge-system">{language === 'es' ? 'Habilitada' : 'Enabled'}</span>
+                      ) : (
+                        <span className="badge-inactive">{language === 'es' ? 'Deshabilitada' : 'Disabled'}</span>
+                      )}
+                    </td>
+                    <td className="actions-cell">
+                      <button 
+                        className="btn-edit"
+                        onClick={() => handleEdit(rule)}
+                      >
+                        {language === 'es' ? 'Editar' : 'Edit'}
+                      </button>
+                      <button 
+                        className="btn-delete"
+                        onClick={() => handleDelete(rule)}
+                      >
+                        {language === 'es' ? 'Eliminar' : 'Delete'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 

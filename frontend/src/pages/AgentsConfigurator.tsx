@@ -7,7 +7,7 @@ import { AgentModal } from '../components/AgentModal';
 import type { Agent } from '../types';
 
 export function AgentsConfigurator() {
-  const { language, t } = useLanguage();
+  const { language } = useLanguage();
   const apiFetch = useApi();
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -96,7 +96,9 @@ export function AgentsConfigurator() {
         <div className="page-header">
           <h1>{language === 'es' ? 'Gestión de Agentes IA' : 'AI Agents Management'}</h1>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-            <Link to="/settings" className="back-link">← {language === 'es' ? 'Volver a Configuración' : 'Back to Settings'}</Link>
+            <Link to="/settings" className="back-link">
+              ← {language === 'es' ? 'Volver a Configuración' : 'Back to Settings'}
+            </Link>
             <Link to="/rules-manager" className="agents-link">
               📋 {language === 'es' ? 'Gestionar Reglas' : 'Manage Rules'}
             </Link>
@@ -114,52 +116,54 @@ export function AgentsConfigurator() {
         {loading ? (
           <div className="loading">{language === 'es' ? 'Cargando...' : 'Loading...'}</div>
         ) : (
-          <table className="agents-table">
-            <thead>
-              <tr>
-                <th>{language === 'es' ? 'Nombre' : 'Name'}</th>
-                <th>{language === 'es' ? 'Nombre Mostrado' : 'Display Name'}</th>
-                <th>{language === 'es' ? 'Descripción' : 'Description'}</th>
-                <th>{language === 'es' ? 'Tipo' : 'Type'}</th>
-                <th>{language === 'es' ? 'Acciones' : 'Actions'}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {agents.map(agent => (
-                <tr key={agent._id}>
-                  <td>
-                    <strong>{agent.name}</strong>
-                    {agent.isSystem && <span className="badge-system">{language === 'es' ? 'Sistema' : 'System'}</span>}
-                    {!agent.isActive && <span className="badge-inactive">{language === 'es' ? 'Inactivo' : 'Inactive'}</span>}
-                  </td>
-                  <td>{agent.displayName}</td>
-                  <td>{agent.description || '-'}</td>
-                  <td>
-                    {agent.isSystem ? (language === 'es' ? 'Sistema' : 'System') : (language === 'es' ? 'Personalizado' : 'Custom')}
-                  </td>
-                  <td className="actions-cell">
-                    {!agent.isSystem && (
-                      <>
-                        <button 
-                          className="btn-edit"
-                          onClick={() => handleEdit(agent)}
-                        >
-                          {language === 'es' ? 'Editar' : 'Edit'}
-                        </button>
-                        <button 
-                          className="btn-delete"
-                          onClick={() => handleDelete(agent)}
-                        >
-                          {language === 'es' ? 'Eliminar' : 'Delete'}
-                        </button>
-                      </>
-                    )}
-                    {agent.isSystem && <span className="text-muted">—</span>}
-                  </td>
+          <div className="table-container">
+            <table className="agents-table">
+              <thead>
+                <tr>
+                  <th>{language === 'es' ? 'Nombre' : 'Name'}</th>
+                  <th>{language === 'es' ? 'Nombre Mostrado' : 'Display Name'}</th>
+                  <th>{language === 'es' ? 'Descripción' : 'Description'}</th>
+                  <th>{language === 'es' ? 'Tipo' : 'Type'}</th>
+                  <th>{language === 'es' ? 'Acciones' : 'Actions'}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {agents.map(agent => (
+                  <tr key={agent._id}>
+                    <td>
+                      <strong>{agent.name}</strong>
+                      {agent.isSystem && <span className="badge-system">{language === 'es' ? 'Sistema' : 'System'}</span>}
+                      {!agent.isActive && <span className="badge-inactive">{language === 'es' ? 'Inactivo' : 'Inactive'}</span>}
+                    </td>
+                    <td>{agent.displayName}</td>
+                    <td>{agent.description || '-'}</td>
+                    <td>
+                      {agent.isSystem ? (language === 'es' ? 'Sistema' : 'System') : (language === 'es' ? 'Personalizado' : 'Custom')}
+                    </td>
+                    <td className="actions-cell">
+                      {!agent.isSystem && (
+                        <>
+                          <button 
+                            className="btn-edit"
+                            onClick={() => handleEdit(agent)}
+                          >
+                            {language === 'es' ? 'Editar' : 'Edit'}
+                          </button>
+                          <button 
+                            className="btn-delete"
+                            onClick={() => handleDelete(agent)}
+                          >
+                            {language === 'es' ? 'Eliminar' : 'Delete'}
+                          </button>
+                        </>
+                      )}
+                      {agent.isSystem && <span className="text-muted">—</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 

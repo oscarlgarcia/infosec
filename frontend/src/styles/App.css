@@ -3992,3 +3992,35 @@ body {
   resize: vertical;
   min-height: 120px;
 }
+
+/* Scrollable table containers for RulesManager and AgentsConfigurator */
+.table-container {
+  max-height: 600px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-top: 10px;
+}
+
+.table-container table {
+  margin: 0;
+}
+
+/* Custom scrollbar */
+.table-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.table-container::-webkit-scrollbar-track {
+  background: var(--surface);
+  border-radius: 4px;
+}
+
+.table-container::-webkit-scrollbar-thumb {
+  background: var(--muted);
+  border-radius: 4px;
+}
+
+.table-container::-webkit-scrollbar-thumb:hover {
+  background: var(--text);
+}
