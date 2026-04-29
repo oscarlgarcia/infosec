@@ -103,8 +103,8 @@ Metrics: {{metrics}}`;
               required 
             />
             <small className="text-muted">
-              Available placeholders: <code>{{'{'{query}'}'}}</code>, <code>{{'{'{sessionSummary}'}'}}</code>, 
-              <code>{{'{'{rules}'}'}}</code>, <code>{{'{'{passages}'}'}}</code>, <code>{{'{'{metrics}'}'}}</code>
+              Available placeholders: <code>{"{{query}}"}</code>, <code>{"{{sessionSummary}}"}</code>,
+              <code>{"{{rules}}"}</code>, <code>{"{{passages}}"}</code>, <code>{"{{metrics}}"}</code>
             </small>
           </div>
 

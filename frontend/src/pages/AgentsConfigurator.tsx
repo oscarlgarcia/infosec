@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useApi } from '../contexts/AuthContext';
 import { useLanguage } from '../i18n/LanguageContext';
 import { Layout } from '../components/Layout';
+import { AgentModal } from '../components/AgentModal';
 import type { Agent } from '../types';
 
 export function AgentsConfigurator() {
@@ -41,7 +42,7 @@ export function AgentsConfigurator() {
 
   const handleEdit = (agent: Agent) => {
     if (agent.isSystem) {
-      alert(t('Cannot edit system agents'));
+      alert(language === 'es' ? 'No se pueden editar los agentes del sistema' : 'Cannot edit system agents');
       return;
     }
     setEditingAgent(agent);
@@ -50,10 +51,10 @@ export function AgentsConfigurator() {
 
   const handleDelete = async (agent: Agent) => {
     if (agent.isSystem) {
-      alert(t('Cannot delete system agents'));
+      alert(language === 'es' ? 'No se pueden eliminar los agentes del sistema' : 'Cannot delete system agents');
       return;
     }
-    if (!confirm(t('Are you sure you want to delete this agent?'))) return;
+    if (!confirm(language === 'es' ? '¿Estás seguro de eliminar este agente?' : 'Are you sure you want to delete this agent?')) return;
     
     try {
       const res = await apiFetch(`/agents/${agent._id}`, { method: 'DELETE' });
@@ -93,29 +94,29 @@ export function AgentsConfigurator() {
     <Layout>
       <div className="agents-configurator">
         <div className="page-header">
-          <h1>{t('AI Agents Management') || 'AI Agents Management'}</h1>
-          <Link to="/settings" className="back-link">← {t('Back to Settings') || 'Back to Settings'}</Link>
+          <h1>{language === 'es' ? 'Gestión de Agentes IA' : 'AI Agents Management'}</h1>
+          <Link to="/settings" className="back-link">← {language === 'es' ? 'Volver a Configuración' : 'Back to Settings'}</Link>
         </div>
 
         {error && <div className="error-message">{error}</div>}
 
         <div className="header-actions">
           <button className="create-btn" onClick={handleCreateNew}>
-            + {t('Create Agent') || 'Create Agent'}
+            + {language === 'es' ? 'Crear Agente' : 'Create Agent'}
           </button>
         </div>
 
         {loading ? (
-          <div className="loading">{t('Loading...') || 'Loading...'}</div>
+          <div className="loading">{language === 'es' ? 'Cargando...' : 'Loading...'}</div>
         ) : (
           <table className="agents-table">
             <thead>
               <tr>
-                <th>{t('Name') || 'Name'}</th>
-                <th>{t('Display Name') || 'Display Name'}</th>
-                <th>{t('Description') || 'Description'}</th>
-                <th>{t('Type') || 'Type'}</th>
-                <th>{t('Actions') || 'Actions'}</th>
+                <th>{language === 'es' ? 'Nombre' : 'Name'}</th>
+                <th>{language === 'es' ? 'Nombre Mostrado' : 'Display Name'}</th>
+                <th>{language === 'es' ? 'Descripción' : 'Description'}</th>
+                <th>{language === 'es' ? 'Tipo' : 'Type'}</th>
+                <th>{language === 'es' ? 'Acciones' : 'Actions'}</th>
               </tr>
             </thead>
             <tbody>
@@ -123,13 +124,13 @@ export function AgentsConfigurator() {
                 <tr key={agent._id}>
                   <td>
                     <strong>{agent.name}</strong>
-                    {agent.isSystem && <span className="badge-system">{t('System') || 'System'}</span>}
-                    {!agent.isActive && <span className="badge-inactive">{t('Inactive') || 'Inactive'}</span>}
+                    {agent.isSystem && <span className="badge-system">{language === 'es' ? 'Sistema' : 'System'}</span>}
+                    {!agent.isActive && <span className="badge-inactive">{language === 'es' ? 'Inactivo' : 'Inactive'}</span>}
                   </td>
                   <td>{agent.displayName}</td>
                   <td>{agent.description || '-'}</td>
                   <td>
-                    {agent.isSystem ? (t('System') || 'System') : (t('Custom') || 'Custom')}
+                    {agent.isSystem ? (language === 'es' ? 'Sistema' : 'System') : (language === 'es' ? 'Personalizado' : 'Custom')}
                   </td>
                   <td className="actions-cell">
                     {!agent.isSystem && (
@@ -138,13 +139,13 @@ export function AgentsConfigurator() {
                           className="btn-edit"
                           onClick={() => handleEdit(agent)}
                         >
-                          {t('Edit') || 'Edit'}
+                          {language === 'es' ? 'Editar' : 'Edit'}
                         </button>
                         <button 
                           className="btn-delete"
                           onClick={() => handleDelete(agent)}
                         >
-                          {t('Delete') || 'Delete'}
+                          {language === 'es' ? 'Eliminar' : 'Delete'}
                         </button>
                       </>
                     )}

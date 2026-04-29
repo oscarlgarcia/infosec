@@ -18,7 +18,7 @@ export function AskKnowledgeBase() {
   const [selectedRequestId, setSelectedRequestId] = useState<string>('');
   const [chats, setChats] = useState<Chat[]>([]);
   const [selectedChatId, setSelectedChatId] = useState<string>('');
-  const [selectedAgent, setSelectedAgent] = useState<Agent>('InfoSec');  // Cambio: ahora es string (nombre)
+  const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
@@ -49,7 +49,7 @@ export function AskKnowledgeBase() {
           setAgents(data);
           // Seleccionar el primer agente por defecto
           if (data.length > 0 && !selectedAgent) {
-            setSelectedAgent(data[0].name);
+            setSelectedAgent(data[0]);
           }
         }
       } catch (err) {
@@ -246,7 +246,7 @@ const handleCreateRequest = async (clientId: string, data: { requestType: string
           clientId: selectedClientId,
           requestId: selectedRequestId || undefined,
           title: 'Nueva conversación',
-          agent: selectedAgent,
+          agent: selectedAgent?.name || 'InfoSec',
         }),
       });
       if (!res.ok) throw new Error(`Error creating chat: ${res.status}`);
@@ -339,7 +339,7 @@ const handleCreateRequest = async (clientId: string, data: { requestType: string
       const res = await apiFetch(`/conversations/${selectedChatId}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: inputValue, agent: selectedAgent }),  // NUEVO: envía selectedAgent (string)
+        body: JSON.stringify({ message: inputValue, agent: selectedAgent?.name || 'InfoSec' }),  // NUEVO: envía selectedAgent (string)
       });
       if (!res.ok) throw new Error(`Error sending message: ${res.status}`);
       const data = await res.json();
@@ -348,7 +348,7 @@ const handleCreateRequest = async (clientId: string, data: { requestType: string
       console.error('Error sending message:', err);
       const assistantMessage: Message = {
         role: 'assistant',
-        content: `Soy el agente ${selectedAgent}. He recibido tu mensaje: "${userMessage.content}". Esta es una respuesta de ejemplo.`,
+        content: `Soy el agente ${selectedAgent?.displayName || selectedAgent?.name || 'InfoSec'}. He recibido tu mensaje: "${userMessage.content}". Esta es una respuesta de ejemplo.`,
         timestamp: new Date().toISOString(),
       };
       setMessages(prev => [...prev, assistantMessage]);
@@ -531,7 +531,7 @@ const chatContent = (
                 <div className="empty-icon">💬</div>
                 <div className="empty-title">{t('newConversation')}</div>
                 <div className="empty-text">
-                  {t('sendMessage')} {selectedAgent}
+                  {t('sendMessage')} {selectedAgent?.displayName || selectedAgent?.name || 'InfoSec'}
                 </div>
               </div>
             ) : (
@@ -579,8 +579,11 @@ const chatContent = (
               <div className="chat-input-header">
                 <select
                   className="agent-selector-in-line"
-                  value={selectedAgent}
-                  onChange={(e) => setSelectedAgent(e.target.value as Agent)}
+                  value={selectedAgent?.name || ''}
+                  onChange={(e) => {
+                    const agent = agents.find(a => a.name === e.target.value);
+                    setSelectedAgent(agent || null);
+                  }}
                 >
                   {agents.map(agent => (
                     <option key={agent._id} value={agent.name}>

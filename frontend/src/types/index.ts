@@ -68,15 +68,19 @@ export interface Conversation extends Chat {
   messages: Message[];
 }
 
-export type Agent = 
-  | 'Standard'
-  | 'InfoSec' 
-  | 'Compliance' 
-  | 'IT' 
-  | 'Cloud' 
-  | 'Legal' 
-  | 'Dev' 
-  | 'Gap Analysis';
+export interface Agent {
+  _id: string;
+  name: string;
+  displayName: string;
+  description: string;
+  type: 'standard' | 'infosec' | 'compliance' | 'it' | 'cloud' | 'legal' | 'dev' | 'gap-analysis' | 'custom';
+  instructions: string;
+  isSystem: boolean;
+  isActive: boolean;
+  createdBy?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
 
 export type UserRole = 'admin' | 'manager' | 'sme' | 'usuario';
 
