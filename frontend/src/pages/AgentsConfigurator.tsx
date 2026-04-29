@@ -95,7 +95,12 @@ export function AgentsConfigurator() {
       <div className="agents-configurator">
         <div className="page-header">
           <h1>{language === 'es' ? 'Gestión de Agentes IA' : 'AI Agents Management'}</h1>
-          <Link to="/settings" className="back-link">← {language === 'es' ? 'Volver a Configuración' : 'Back to Settings'}</Link>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <Link to="/settings" className="back-link">← {language === 'es' ? 'Volver a Configuración' : 'Back to Settings'}</Link>
+            <Link to="/rules-manager" className="agents-link">
+              📋 {language === 'es' ? 'Gestionar Reglas' : 'Manage Rules'}
+            </Link>
+          </div>
         </div>
 
         {error && <div className="error-message">{error}</div>}

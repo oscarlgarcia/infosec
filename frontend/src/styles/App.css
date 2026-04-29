@@ -3954,3 +3954,41 @@ body {
 .agents-link:visited {
   color: white;
 }
+
+/* Rules Manager Styles */
+.rules-manager {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.rules-manager .page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.applies-to-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.applies-to-badge {
+  background: var(--surface);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.rule-modal textarea {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: 'Courier New', monospace;
+  resize: vertical;
+  min-height: 120px;
+}

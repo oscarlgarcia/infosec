@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import type { Agent } from '../types';
+import { useApi } from '../contexts/AuthContext';
+import type { Agent, AnswerRule } from '../types';
 
 interface AgentModalProps {
   agent: Agent | null;  // null = create, Agent = edit
@@ -13,6 +14,8 @@ export function AgentModal({ agent, onSave, onClose }: AgentModalProps) {
   const [description, setDescription] = useState(agent?.description || '');
   const [instructions, setInstructions] = useState(agent?.instructions || '');
   const [error, setError] = useState<string | null>(null);
+  const [associatedRules, setAssociatedRules] = useState<AnswerRule[]>([]);
+  const apiFetch = useApi();
 
   useEffect(() => {
     if (agent) {
@@ -20,6 +23,12 @@ export function AgentModal({ agent, onSave, onClose }: AgentModalProps) {
       setDisplayName(agent.displayName);
       setDescription(agent.description || '');
       setInstructions(agent.instructions || '');
+      
+      // Fetch rules for this agent
+      apiFetch(`/rules?agent=${agent.name}`)
+        .then(res => res.json())
+        .then(data => setAssociatedRules(data))
+        .catch(err => console.error('Error loading rules:', err));
     }
   }, [agent]);
 
@@ -107,6 +116,33 @@ Metrics: {{metrics}}`;
               <code>{"{{rules}}"}</code>, <code>{"{{passages}}"}</code>, <code>{"{{metrics}}"}</code>
             </small>
           </div>
+
+          {associatedRules.length > 0 && (
+            <div className="form-group">
+              <label>{language === 'es' ? `Reglas asociadas (${associatedRules.length}):` : `Associated Rules (${associatedRules.length}):`}</label>
+              <div style={{ 
+                maxHeight: '150px', 
+                overflowY: 'auto', 
+                border: '1px solid var(--border)', 
+                borderRadius: '6px', 
+                padding: '8px' 
+              }}>
+                {associatedRules.map(rule => (
+                  <div key={(rule as any)._id || rule._id} style={{ 
+                    padding: '4px 8px', 
+                    fontSize: '13px',
+                    borderBottom: '1px solid var(--border)'
+                  }}>
+                    <strong>{(rule as any).name || rule.name}</strong>
+                    {!((rule as any).enabled ?? rule.enabled) && <span style={{ color: 'var(--muted)', marginLeft: '8px' }}>({language === 'es' ? 'Deshabilitada' : 'Disabled'})</span>}
+                  </div>
+                ))}
+              </div>
+              <small className="text-muted">
+                {language === 'es' ? 'Las reglas se gestionan en ' : 'Rules are managed in '}<Link to="/rules-manager">Rules Manager</Link>
+              </small>
+            </div>
+          )}
 
           <div className="modal-actions">
             <button type="submit" className="agents-link" style={{ border: 'none', cursor: 'pointer' }}>

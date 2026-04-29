@@ -82,6 +82,18 @@ export interface Agent {
   updatedAt?: string;
 }
 
+export interface AnswerRule {
+  _id: string;
+  name: string;
+  content: string;
+  domain?: string;
+  appliesTo?: string[];  // Agent names this rule applies to (empty = all agents)
+  enabled: boolean;
+  version: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export type UserRole = 'admin' | 'manager' | 'sme' | 'usuario';
 
 export interface User {

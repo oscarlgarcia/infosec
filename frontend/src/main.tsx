@@ -24,6 +24,7 @@ import { KbCandidatesPage } from './pages/KbCandidates'
 import { KnowledgeGraphPage } from './pages/KnowledgeGraph'
 import { GapFinderPage } from './pages/GapFinder'
 import { AgentsConfigurator } from './pages/AgentsConfigurator'
+import { RulesManager } from './pages/RulesManager'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
@@ -158,6 +159,14 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
               element={
                 <ProtectedRoute>
                   <AgentsConfigurator />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/rules-manager"
+              element={
+                <ProtectedRoute>
+                  <RulesManager />
                 </ProtectedRoute>
               }
             />
