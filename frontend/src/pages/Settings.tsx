@@ -58,9 +58,10 @@ export function Settings() {
         <div className="settings-section">
           <h2 className="settings-section-title">{language === 'es' ? 'Base de Conocimientos' : 'Knowledge Base'}</h2>
           <button
-            className="btn-primary"
+            className="settings-link"
             onClick={handleReindex}
             disabled={reindexing}
+            style={{ border: 'none', cursor: reindexing ? 'not-allowed' : 'pointer', opacity: reindexing ? 0.6 : 1 }}
           >
             {reindexing 
               ? (language === 'es' ? 'Reindexando...' : 'Reindexing...') 
