@@ -84,7 +84,7 @@ function computeStalenessPenalty(sources: Array<{ updatedAt?: Date }>): number {
   return Number(Math.min(0.25, staleSources.length / Math.max(1, sources.length) * 0.25).toFixed(2));
 }
 
-async function buildInstructions(args: {
+async function buildInstructions(params: {
   agentName?: string;  // NUEVO: nombre del agente
   query: string;
   sessionSummary: string;
@@ -93,19 +93,22 @@ async function buildInstructions(args: {
 }): Promise<string> {
   
   // Obtener instrucciones del agente desde la BD
-  let agent = await getAgentByName(args.agentName || 'InfoSec');
+  console.error('[LLM INPUT] buildInstructions: Looking for agent: ' + (params.agentName || 'InfoSec (default)'));
+  let agent = await getAgentByName(params.agentName || 'InfoSec');
   
   // Si no existe, usar InfoSec por defecto
   if (!agent) {
+    console.error('[LLM INPUT] buildInstructions: Agent not found, using InfoSec default');
     agent = await getAgentByName('InfoSec');
   }
+  console.error('[LLM INPUT] buildInstructions: Using agent: ' + (agent?.name || 'UNKNOWN') + ', instructions length: ' + (agent?.instructions?.length || 0));
   
   // Reemplazar placeholders en el template del agente
   return agent!.instructions
-    .replace(/\{\{query\}\}/g, args.query)
-    .replace(/\{\{sessionSummary\}\}/g, args.sessionSummary || 'No previous summary.')
-    .replace(/\{\{rules\}\}/g, args.rules.join('\n') || 'No rules.')
-    .replace(/\{\{passages\}\}/g, args.passages.join('\n\n') || 'No passages recovered.')
+    .replace(/\{\{query\}\}/g, params.query)
+    .replace(/\{\{sessionSummary\}\}/g, params.sessionSummary || 'No previous summary.')
+    .replace(/\{\{rules\}\}/g, params.rules.join('\n') || 'No rules.')
+    .replace(/\{\{passages\}\}/g, params.passages.join('\n\n') || 'No passages recovered.')
     .replace(/\{\{metrics\}\}/g, 'Metrics not available yet.'); // Placeholder para futuro
 }
 
@@ -130,7 +133,7 @@ export async function runChatQuery(input: ChatQueryInput): Promise<ChatQueryOutp
   const rules = await AnswerRule.find({
     enabled: true,
     $or: [
-      { appliesTo: { $in: [args.agentName] } },
+      { appliesTo: { $in: [input.agent] } },
       { appliesTo: { $exists: false } },
       { appliesTo: { $size: 0 } }
     ]
@@ -173,6 +176,12 @@ export async function runChatQuery(input: ChatQueryInput): Promise<ChatQueryOutp
     console.error('[DEBUG] buildInstructions FAILED: ' + e.message + ' ' + e.stack);
     instructions = 'ERROR: Failed to build instructions';
   }
+  
+  // DEBUG: Log agent and instructions being sent to LLM
+  console.error('[LLM INPUT] Agent: ' + (input.agent || 'InfoSec (default)'));
+  console.error('[LLM INPUT] Instructions length: ' + (instructions ? instructions.length : 'undefined'));
+  console.error('[LLM INPUT] Instructions preview: ' + (instructions ? instructions.substring(0, 500) : 'N/A'));
+  console.error('[LLM INPUT] Question: ' + input.question);
 
   const vectorStoreIds = env.OPENAI_VECTOR_STORE_IDS
     .split(',')

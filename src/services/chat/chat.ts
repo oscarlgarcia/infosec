@@ -365,16 +365,19 @@ export async function sendMessage(
   let responseId: string | undefined;
 
   try {
+    console.error('[LLM INPUT] sendMessage: Calling runChatQuery with agent: ' + (agent || conv.agent || 'InfoSec'));
     const ragResponse = await runChatQuery({
       requestId: context?.requestId || newId('req'),
       userId: context?.userId,
       clientId: conv.clientId.toString(),
       sessionId: conversationId,
       question: userMessage,
+      agent: agent || conv.agent,
       taskProfile: `Conversation agent: ${agent || conv.agent || 'InfoSec'}`,
       expectedFormat: 'Provide concise answer and evidence bullets.',
       domain: 'infosec',
     });
+    console.error('[LLM INPUT] sendMessage: runChatQuery succeeded');
     responseId = ragResponse.response_id;
     responseContent = ragResponse.answer_text;
 
@@ -389,7 +392,8 @@ export async function sendMessage(
     if (ragResponse.flags.length > 0) {
       responseContent += `\n\nFlags: ${ragResponse.flags.join(', ')}`;
     }
-  } catch {
+  } catch (error) {
+    console.error('[LLM INPUT] sendMessage: runChatQuery FAILED, falling back to processQuestion. Error: ' + error.message);
     const agentResponse = await processQuestion(userMessage, agent);
     responseContent = agentResponse.content;
     if (agentResponse.docGapReport) {
