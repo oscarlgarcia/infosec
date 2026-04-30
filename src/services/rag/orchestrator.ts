@@ -110,6 +110,11 @@ async function buildInstructions(args: {
 }
 
 export async function runChatQuery(input: ChatQueryInput): Promise<ChatQueryOutput> {
+  // DEBUG: Log that function is called
+  try {
+    require('fs').writeFileSync('/app/function-called.log', 'CALLED: ' + new Date().toISOString() + ' Question: ' + input.question + '\n');
+  } catch(e) {}
+  
   const startedAt = Date.now();
   const client = await Client.findById(input.clientId).lean();
   if (!client) {
@@ -154,13 +159,20 @@ export async function runChatQuery(input: ChatQueryInput): Promise<ChatQueryOutp
     passages.push(`[CANONICAL] ${(canonicalMatch as any).currentAnswer.slice(0, 300)}`);
   }
 
-  const instructions = await buildInstructions({
-    agentName: input.agent,  // NUEVO: pasar el nombre del agente
-    query: input.question,
-    sessionSummary: (sessionSummary as any)?.summaryText || '',
-    rules: rules.map((rule: any) => rule.content),
-    passages,
-  });
+  let instructions;
+  try {
+    instructions = await buildInstructions({
+      agentName: input.agent,
+      query: input.question,
+      sessionSummary: (sessionSummary as any)?.summaryText || '',
+      rules: rules.map((rule: any) => rule.content),
+      passages,
+    });
+    console.error('[DEBUG] buildInstructions completed successfully');
+  } catch(e) {
+    console.error('[DEBUG] buildInstructions FAILED: ' + e.message + ' ' + e.stack);
+    instructions = 'ERROR: Failed to build instructions';
+  }
 
   const vectorStoreIds = env.OPENAI_VECTOR_STORE_IDS
     .split(',')

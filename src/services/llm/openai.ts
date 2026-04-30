@@ -30,6 +30,10 @@ export interface ChatOptions {
 export async function chat(options: ChatOptions): Promise<string> {
   const { messages, model = 'qwen2.5:latest', temperature = 0.7, maxTokens = 4000 } = options;
   
+  // DEBUG: Log LLM inputs
+  console.error('[LLM INPUT] Model: ' + model);
+  console.error('[LLM INPUT] Messages: ' + JSON.stringify(messages, null, 2));
+  
   try {
     const response = await openai.chat.completions.create({
       model,
@@ -187,6 +191,12 @@ export async function generateWithResponses(options: ResponseGenerationOptions):
   if (!responsesClient || typeof responsesClient.create !== 'function') {
     throw new Error('Responses API is not available in current OpenAI SDK/runtime');
   }
+
+  // DEBUG: Log LLM inputs
+  console.error('[LLM INPUT] Model: ' + env.OPENAI_MODEL);
+  console.error('[LLM INPUT] Instructions: ' + instructions);
+  console.error('[LLM INPUT] Input: ' + input);
+  console.error('[LLM INPUT] VectorStoreIds: ' + JSON.stringify(vectorStoreIds));
 
   const tools = vectorStoreIds.length > 0
     ? [{ type: 'file_search' as const, vector_store_ids: vectorStoreIds }]
