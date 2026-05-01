@@ -24,10 +24,8 @@ export async function retrieveRelevantPassages(args: {
 
   const results: RetrievedPassage[] = [];
   const collections = [
-    { name: 'knowledge', sourceType: 'document' as const },
-    { name: 'qanda', sourceType: 'qa' as const },
-    { name: 'cms', sourceType: 'cms' as const },
-    { name: 'faq', sourceType: 'faq' as const },
+    { name: 'infosec-kb', sourceType: 'document' as const },  // Documentos subidos (kb_documents)
+    { name: 'qanda', sourceType: 'qa' as const },          // Q&A del documento Q&A.txt
   ];
 
   const perCollectionLimit = Math.ceil(limit / 2); // At least 3 from each
