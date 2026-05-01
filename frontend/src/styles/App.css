@@ -4024,3 +4024,58 @@ body {
 .table-container::-webkit-scrollbar-thumb:hover {
   background: var(--text);
 }
+
+/* Rules Explorer */
+.rules-explorer {
+  margin-top: 12px;
+}
+
+.rules-explorer > div {
+  transition: background-color 0.2s;
+}
+
+.rules-explorer > div:hover {
+  background-color: var(--bg-hover);
+}
+
+/* Rule Viewer Modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: var(--bg-primary);
+  padding: 20px;
+  border-radius: 8px;
+  max-width: 500px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.modal-content h3 {
+  margin-top: 0;
+  margin-bottom: 12px;
+  color: var(--text);
+}
+
+.modal-content pre {
+  background: var(--bg-secondary);
+  padding: 12px;
+  border-radius: 6px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-size: 13px;
+  line-height: 1.6;
+  max-height: 400px;
+  overflow-y: auto;
+}

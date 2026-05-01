@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLanguage } from '../i18n/LanguageContext';
 import { Layout } from '../components/Layout';
 import { useApi } from '../contexts/AuthContext';
@@ -10,9 +10,41 @@ export function Settings() {
   const apiFetch = useApi();
   const [reindexing, setReindexing] = useState(false);
   const [reindexMsg, setReindexMsg] = useState('');
+  const [debugLogging, setDebugLogging] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const toggleLanguage = () => {
     setLanguage(language === 'es' ? 'en' : 'es');
+  };
+
+  useEffect(() => {
+    const fetchDebugSetting = async () => {
+      try {
+        const res = await apiFetch('/settings/llm-debug');
+        const data = await res.json();
+        setDebugLogging(data.enabled);
+      } catch (e) {
+        console.error('Failed to fetch debug setting:', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDebugSetting();
+  }, []);
+
+  const toggleDebugLogging = async () => {
+    const newValue = !debugLogging;
+    setDebugLogging(newValue);
+    try {
+      await apiFetch('/settings/llm-debug', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: newValue }),
+      });
+    } catch (e) {
+      console.error('Failed to save debug setting:', e);
+      setDebugLogging(!newValue);
+    }
   };
 
   const handleReindex = async () => {
@@ -70,6 +102,33 @@ export function Settings() {
           {reindexMsg && (
             <p className="reindex-msg">{reindexMsg}</p>
           )}
+        </div>
+
+        <div className="settings-section">
+          <h2 className="settings-section-title">
+            {language === 'es' ? 'Depuración LLM' : 'LLM Debug Logging'}
+          </h2>
+          <div className="language-toggle">
+            <span className={`lang-option ${!debugLogging ? 'active' : ''}`}>
+              {language === 'es' ? 'DESACTIVADO' : 'OFF'}
+            </span>
+            <button 
+              className="toggle-switch"
+              onClick={toggleDebugLogging}
+              disabled={loading}
+              aria-label="Toggle LLM debug logging"
+            >
+              <span className={`toggle-slider ${debugLogging ? 'right' : 'left'}`}></span>
+            </button>
+            <span className={`lang-option ${debugLogging ? 'active' : ''}`}>
+              {language === 'es' ? 'ACTIVADO' : 'ON'}
+            </span>
+          </div>
+          <p className="language-description">
+            {language === 'es' 
+              ? 'Muestra en consola lo que se envía al LLM' 
+              : 'Log to console what is sent to the LLM'}
+          </p>
         </div>
 
         <div className="settings-section">
