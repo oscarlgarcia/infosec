@@ -73,6 +73,8 @@ services:
       - "5174:80"
     networks:
       - infosec
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
 volumes:
   mongo_data:

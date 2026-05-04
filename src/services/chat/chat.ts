@@ -363,10 +363,11 @@ export async function sendMessage(
 
   let responseContent = '';
   let responseId: string | undefined;
+  let ragResponse: any = undefined;
 
   try {
     console.error('[LLM INPUT] sendMessage: Calling runChatQuery with agent: ' + (agent || conv.agent || 'InfoSec'));
-    const ragResponse = await runChatQuery({
+    ragResponse = await runChatQuery({
       requestId: context?.requestId || newId('req'),
       userId: context?.userId,
       clientId: conv.clientId.toString(),
@@ -380,41 +381,29 @@ export async function sendMessage(
     console.error('[LLM INPUT] sendMessage: runChatQuery succeeded');
     responseId = ragResponse.response_id;
     responseContent = ragResponse.answer_text;
-
-    if (ragResponse.citations.length > 0) {
-      const citationsText = ragResponse.citations
-        .slice(0, 5)
-        .map((citation, index) => `- [${index + 1}] ${citation.filename || citation.fileId || 'source'}${citation.score ? ` (score ${citation.score})` : ''}`)
-        .join('\n');
-      responseContent += `\n\nSources:\n${citationsText}`;
-    }
-
-    if (ragResponse.flags.length > 0) {
-      responseContent += `\n\nFlags: ${ragResponse.flags.join(', ')}`;
-    }
+    // NO appendear citas y flags al contenido - se pasan como metadata
   } catch (error) {
     console.error('[LLM INPUT] sendMessage: runChatQuery FAILED, falling back to processQuestion. Error: ' + error.message);
     const agentResponse = await processQuestion(userMessage, agent);
     responseContent = agentResponse.content;
-    if (agentResponse.docGapReport) {
-      responseContent += `\n\n[DOC_GAP_REPORT]
-PREGUNTA_ORIGINAL: ${agentResponse.docGapReport.question}
-COBERTURA_DOCUMENTAL: ${agentResponse.docGapReport.coverage}
-DESCRIPCION_HUECO: ${agentResponse.docGapReport.description}
-SECCION_RECOMENDADA: ${agentResponse.docGapReport.recommendedSection}
-[/DOC_GAP_REPORT]`;
-    }
-
-    const rolesText = agentResponse.roles.length > 0
-      ? agentResponse.roles.join(', ')
-      : 'No aplicable';
-    responseContent += `\n\n---\nRol que ha respondido: ${rolesText}`;
+    // NO appendear información adicional al contenido
   }
 
   const assistantMsg: Message = {
     role: 'assistant',
     content: responseContent,
     timestamp: new Date(),
+    // Solo agregar metadata si hay datos disponibles (RAG flow)
+    ...(typeof ragResponse !== 'undefined' ? {
+      metadata: {
+        confidence: ragResponse.confidence,
+        coverage_status: ragResponse.coverage_status,
+        flags: ragResponse.flags,
+        citations: ragResponse.citations,
+        used_sources: ragResponse.used_sources,
+        response_id: ragResponse.response_id,
+      }
+    } : {})
   };
   conv.messages.push(assistantMsg);
 

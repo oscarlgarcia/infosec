@@ -61,6 +61,15 @@ export interface Message {
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: string;
+  // NUEVOS CAMPOS PARA METADATOS RAG
+  metadata?: {
+    confidence?: number;
+    coverage_status?: 'covered' | 'partial' | 'uncovered' | 'weak' | 'contradictory' | 'human_review';
+    flags?: string[];
+    citations?: Array<{ fileId?: string; filename?: string; score?: number; snippet?: string }>;
+    used_sources?: Array<{ sourceType: string; itemId: string; title: string; score: number }>;
+    response_id?: string;
+  };
 }
 
 export interface Conversation extends Chat {
