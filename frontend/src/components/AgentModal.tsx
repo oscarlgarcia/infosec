@@ -65,10 +65,16 @@ export function AgentModal({ agent, onSave, onClose }: AgentModalProps) {
     e.preventDefault();
     setError(null);
 
-    if (!name.trim() || !displayName.trim() || !instructions.trim()) {
-      setError('Name, Display Name, and Instructions are required');
-      return;
-    }
+      if (!name.trim() || !displayName.trim() || !instructions.trim()) {
+        setError('Name, Display Name, and Instructions are required');
+        return;
+      }
+      
+      // Validate name format (no spaces, unique identifier)
+      if (!/^[a-zA-Z0-9_-]+$/.test(name.trim())) {
+        setError('Name must be alphanumeric (letters, numbers, hyphens, underscores only, no spaces)');
+        return;
+      }
 
     try {
       if (agent) {
