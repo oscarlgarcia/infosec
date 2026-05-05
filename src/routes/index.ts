@@ -848,7 +848,7 @@ export async function routes(fastify: FastifyInstance) {
       department: Department 
     } 
   }>(
-    '/documents',
+    '/kb/documents',
     { preHandler: [verifyToken, requireRole('admin', 'manager', 'sme')] },
     async (request: FastifyRequest<{ Body: { filePath: string; originalName: string; department: Department } }>, reply: FastifyReply) => {
       const { filePath, originalName, department } = request.body;
@@ -858,7 +858,7 @@ export async function routes(fastify: FastifyInstance) {
   );
 
   fastify.get<{ Querystring: { department?: Department } }>(
-    '/documents', 
+    '/kb/documents', 
     { preHandler: [verifyToken, requireRole('admin', 'manager', 'sme')] }, 
     async (request: FastifyRequest<{ Querystring: { department?: Department } }>) => {
       const { department } = request.query;
@@ -877,7 +877,7 @@ export async function routes(fastify: FastifyInstance) {
 
     // Semantic search for KB documents
     fastify.get<{ Querystring: { q: string; department?: Department; limit?: number } }>(
-      '/documents/search',
+      '/kb/documents/search',
       { preHandler: [verifyToken] },
       async (request: FastifyRequest<{ Querystring: { q: string; department?: Department; limit?: number } }>) => {
         const { q, department, limit } = request.query;

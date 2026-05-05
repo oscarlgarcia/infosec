@@ -64,10 +64,10 @@ async function start() {
       secret: env.JWT_SECRET,
     });
 
-    await fastify.register(authRoutes);
-    await fastify.register(userRoutes);
+    await fastify.register(authRoutes, { prefix: '/api' });
+    await fastify.register(userRoutes, { prefix: '/api' });
     try {
-      await fastify.register(routes);
+      await fastify.register(routes, { prefix: '/api' });
       console.log('[Routes] Routes loaded successfully');
     } catch (routeError) {
       console.error('[Routes] ERROR loading routes:', routeError);
