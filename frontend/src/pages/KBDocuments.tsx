@@ -13,6 +13,7 @@ interface KBDocument {
   originalName: string;
   department: string;
   createdAt: string;
+  lastIndexedAt?: string;
   path?: string;
   metadata?: {
     size?: number;
@@ -117,6 +118,7 @@ export function KBDocumentsPage() {
                 <th>{language === 'es' ? 'Nombre' : 'Name'}</th>
                 <th>{language === 'es' ? 'Departamento' : 'Department'}</th>
                 <th>{language === 'es' ? 'Fecha' : 'Date'}</th>
+                <th>{language === 'es' ? 'Última indexación' : 'Last indexed'}</th>
                 <th>{language === 'es' ? 'Tamaño' : 'Size'}</th>
                 <th>{language === 'es' ? 'Acción' : 'Action'}</th>
               </tr>
@@ -140,6 +142,7 @@ export function KBDocumentsPage() {
                   </td>
                   <td>{doc.department}</td>
                   <td>{new Date(doc.createdAt).toLocaleDateString()}</td>
+                  <td>{doc.lastIndexedAt ? new Date(doc.lastIndexedAt).toLocaleDateString() : (language === 'es' ? 'No indexado' : 'Not indexed')}</td>
                   <td>{(doc.metadata?.size || 0) / (1024 * 1024) > 0.01 ? ((doc.metadata?.size || 0) / (1024 * 1024)).toFixed(2) + ' MB' : '< 0.01 MB'}</td>
                   <td>
                     <button

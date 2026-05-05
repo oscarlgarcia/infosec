@@ -75,7 +75,7 @@ services:
       - infosec
     extra_hosts:
       - "host.docker.internal:host-gateway"
-      - "backend:172.18.0.1"
+      - "backend:host-gateway"
 
 volumes:
   mongo_data:

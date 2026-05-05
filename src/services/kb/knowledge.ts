@@ -280,7 +280,10 @@ export async function semanticSearchDocuments(
   }
 
   export async function reindexDocumentsToChroma(): Promise<{ success: number; failed: number }> {
-    const docs = await DocumentModel.find({}).lean() as any[];
+    const docs = await DocumentModel.find({ 
+      content: { $exists: true, $ne: '' } 
+    }).lean() as any[];
+    
     console.log(`🔄 Re-indexing ${docs.length} documents to ChromaDB...`);
     
     const client = await getChromaClient();
@@ -296,58 +299,51 @@ export async function semanticSearchDocuments(
     
     let success = 0;
     let failed = 0;
+    const batchSize = 10;
     
-    for (const doc of docs) {
+    for (let i = 0; i < docs.length; i += batchSize) {
+      const batch = docs.slice(i, i + batchSize);
+      const contents = batch.map(doc => doc.content || '');
+      
       try {
-        const content = doc.content || '';
-        if (content.length < 5) {
-          failed++;
-          continue;
-        }
+        const embeddings = await createEmbeddings(contents);
         
-        let embedding: number[] = [];
+        const validItems = batch.map((doc, idx) => ({
+          doc,
+          embedding: embeddings[idx] || [],
+          content: contents[idx]
+        })).filter(item => item.embedding.length > 0);
         
-        // Try Ollama first, then fallback to OpenAI
-        try {
-          embedding = await createOllamaEmbedding(content);
-          if (embedding.length === 0) {
-            console.log(`⚠️ Empty Ollama embedding for ${doc.originalName}, trying OpenAI...`);
-            const openaiEmbeddings = await createEmbeddings([content]);
-            embedding = openaiEmbeddings[0] || [];
-          }
-        } catch (embedError) {
-          console.error(`❌ Embedding failed for ${doc.originalName}:`, embedError);
-          failed++;
-          continue;
-        }
-        
-        if (embedding.length === 0) {
-          console.error(`❌ No embedding generated for ${doc.originalName}`);
-          failed++;
+        if (validItems.length === 0) {
+          failed += batch.length;
           continue;
         }
         
         await collection.add({
-          ids: [doc._id.toString()],
-          embeddings: [embedding],
-          documents: [content],
-          metadatas: [{
-            originalName: doc.originalName || '',
-            department: doc.department || '',
+          ids: validItems.map(item => item.doc._id.toString()),
+          embeddings: validItems.map(item => item.embedding),
+          documents: validItems.map(item => item.content),
+          metadatas: validItems.map(item => ({
+            originalName: item.doc.originalName || '',
+            department: item.doc.department || '',
             source: 'document'
-          }]
+          }))
         });
         
-        // Update lastIndexedAt
-        await DocumentModel.findByIdAndUpdate(doc._id, { lastIndexedAt: new Date() });
+        // Update lastIndexedAt for all successfully indexed docs
+        const ids = validItems.map(item => item.doc._id);
+        await DocumentModel.updateMany(
+          { _id: { $in: ids } },
+          { lastIndexedAt: new Date() }
+        );
         
-        success++;
-        if (success % 10 === 0) {
-          console.log(`✅ Indexed ${success}/${docs.length}`);
-        }
+        success += validItems.length;
+        failed += (batch.length - validItems.length);
+        
+        console.log(`✅ Indexed ${success}/${docs.length}`);
       } catch (err) {
-        console.error(`❌ Failed to index ${doc.originalName}:`, err);
-        failed++;
+        console.error(`❌ Failed to index batch starting at ${i}:`, err);
+        failed += batch.length;
       }
     }
     
