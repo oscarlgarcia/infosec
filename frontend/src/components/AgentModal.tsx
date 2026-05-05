@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useApi } from '../contexts/AuthContext';
 import { useLanguage } from '../i18n/LanguageContext';
 import { Link } from 'react-router-dom';
@@ -21,6 +21,8 @@ export function AgentModal({ agent, onSave, onClose }: AgentModalProps) {
   const [availableRules, setAvailableRules] = useState<any[]>([]);
   const [selectedRuleIds, setSelectedRuleIds] = useState<Set<string>>(new Set());
   const [viewingRule, setViewingRule] = useState<any | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   const apiFetch = useApi();
 
   useEffect(() => {
@@ -63,23 +65,30 @@ export function AgentModal({ agent, onSave, onClose }: AgentModalProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-
-      if (!name.trim() || !displayName.trim() || !instructions.trim()) {
-        setError('Name, Display Name, and Instructions are required');
-        return;
-      }
-      
-      // Validate name format (no spaces, unique identifier)
-      if (!/^[a-zA-Z0-9_-]+$/.test(name.trim())) {
-        setError('Name must be alphanumeric (letters, numbers, hyphens, underscores only, no spaces)');
-        return;
-      }
-
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    setSubmitting(true);
+    setError('');
+    
+    if (!name.trim() || !displayName.trim() || !instructions.trim()) {
+      setError('Name, Display Name, and Instructions are required');
+      submittingRef.current = false;
+      setSubmitting(false);
+      return;
+    }
+    
+    // Validate name format (no spaces, unique identifier)
+    if (!/^[a-zA-Z0-9_-]+$/.test(name.trim())) {
+      setError('Name must be alphanumeric (letters, numbers, hyphens, underscores only, no spaces)');
+      submittingRef.current = false;
+      setSubmitting(false);
+      return;
+    }
+    
     try {
       if (agent) {
-        // Update agent
-        await apiFetch(`/agents/${String(agent._id || (agent as any)._id || (agent as any).id)}`, {
+        // Update existing agent
+        await apiFetch(`/agents/${agent.name}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -88,33 +97,34 @@ export function AgentModal({ agent, onSave, onClose }: AgentModalProps) {
             instructions: instructions.trim(),
           }),
         });
-
-        // Update appliesTo for EACH rule
-        const allRules = [...availableRules];
-        for (const rule of allRules) {
-          const ruleId = (rule as any)._id || (rule as any).id || '';
-          if (!ruleId) continue;
+        
+        // Handle rule assignments - check ALL available rules
+        const selectedIds = Array.from(selectedRuleIds);
+        
+        for (const rule of availableRules) {
+          const ruleId = String(rule._id);
+          const currentAppliesTo = rule.appliesTo || [];
+          const isSelected = selectedIds.includes(ruleId);
+          const isAssigned = currentAppliesTo.includes(agent.name);
           
-          const isSelected = selectedRuleIds.has(ruleId);
-          const currentAppliesTo = (rule as any).appliesTo || [];
-          const hasAgent = currentAppliesTo.includes(name.trim());
-          
-          if (isSelected && !hasAgent && ruleId) {
-            // Assign to agent
+          // Add agent to rule's appliesTo if selected but not assigned
+          if (isSelected && !isAssigned) {
             await apiFetch(`/rules/${ruleId}`, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                appliesTo: [...currentAppliesTo, name.trim()]
+                appliesTo: [...currentAppliesTo, agent.name]
               }),
             });
-          } else if (!isSelected && hasAgent && ruleId) {
-            // Unassign from agent
+          }
+          
+          // Remove agent from rule's appliesTo if assigned but not selected
+          if (!isSelected && isAssigned) {
             await apiFetch(`/rules/${ruleId}`, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                appliesTo: currentAppliesTo.filter((a: string) => a !== name.trim())
+                appliesTo: currentAppliesTo.filter((a: string) => a !== agent.name)
               }),
             });
           }
@@ -136,6 +146,9 @@ export function AgentModal({ agent, onSave, onClose }: AgentModalProps) {
       onSave({});
     } catch (err: any) {
       setError(err.message || 'Error saving agent');
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
     }
   };
 
@@ -307,8 +320,8 @@ Metrics: {{metrics}}`;
           </div>
 
           <div className="modal-actions">
-            <button type="submit" className="agents-link" style={{ border: 'none', cursor: agent?.isSystem ? 'not-allowed' : 'pointer' }} disabled={!!agent?.isSystem}>
-              {agent ? 'Update' : 'Create'}
+            <button type="submit" className="agents-link" style={{ border: 'none', cursor: (agent?.isSystem || submitting) ? 'not-allowed' : 'pointer' }} disabled={!!agent?.isSystem || submitting}>
+              {submitting ? 'Saving...' : (agent ? 'Update' : 'Create')}
             </button>
             <button type="button" className="settings-link" onClick={onClose} style={{ border: 'none', cursor: 'pointer' }}>
               Cancel

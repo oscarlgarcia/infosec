@@ -38,19 +38,19 @@ export async function createAgent(data: {
 }
 
 // Actualizar agente (allow InfoSec and Standard)
-export async function updateAgent(id: string, data: Partial<{
+export async function updateAgent(name: string, data: Partial<{
   displayName?: string;
   description?: string;
   instructions?: string;
 }>): Promise<IAgent | null> {
-  const agent = await Agent.findById(id);
+  const agent = await Agent.findOne({ name });
   if (!agent) throw new Error('Agent not found');
   if (agent.isSystem && agent.name !== 'InfoSec' && agent.name !== 'Standard') {
     throw new Error('Cannot modify system agents');
   }
   
-  return Agent.findByIdAndUpdate(
-    id, 
+  return Agent.findOneAndUpdate(
+    { name }, 
     { ...data, updatedAt: new Date() }, 
     { new: true }
   );

@@ -67,34 +67,10 @@ export function AgentsConfigurator() {
     }
   };
 
-  const handleSave = async (data: Partial<Agent>) => {
-    try {
-      if (editingAgent) {
-        // Double-check: cannot modify system agents
-        if (editingAgent.isSystem) {
-          alert(language === 'es' ? 'No se pueden editar los agentes del sistema' : 'Cannot edit system agents');
-          return;
-        }
-        const res = await apiFetch(`/agents/${editingAgent._id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
-        });
-        if (!res.ok) throw new Error(`Error: ${res.status}`);
-      } else {
-        const res = await apiFetch('/agents', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
-        });
-        if (!res.ok) throw new Error(`Error: ${res.status}`);
-      }
-      setShowModal(false);
-      setEditingAgent(null);
-      await loadAgents();
-    } catch (err: any) {
-      alert(`Error: ${err.message}`);
-    }
+  const handleSave = async () => {
+    setShowModal(false);
+    setEditingAgent(null);
+    await loadAgents();
   };
 
   return (
