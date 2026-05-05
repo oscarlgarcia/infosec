@@ -10,6 +10,8 @@ export function Settings() {
   const apiFetch = useApi();
   const [reindexing, setReindexing] = useState(false);
   const [reindexMsg, setReindexMsg] = useState('');
+  const [reindexDocsLoading, setReindexDocsLoading] = useState(false);
+  const [reindexDocsMsg, setReindexDocsMsg] = useState('');
   const [debugLogging, setDebugLogging] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -52,15 +54,30 @@ export function Settings() {
     setReindexing(true);
     setReindexMsg('');
     try {
-      const res = await apiFetch('/qa/reindex', { method: 'POST' });
-      const data = await res.json();
-      setReindexMsg(language === 'es' ? `Reindexado: ${data.success} éxitos, ${data.failed} fallos` : `Reindexed: ${data.success} success, ${data.failed} failed`);
-    } catch (e) {
-      setReindexMsg(language === 'es' ? 'Error en reindexado' : 'Reindex failed');
-    } finally {
-      setReindexing(false);
-    }
-  };
+        const res = await apiFetch('/qa/reindex', { method: 'POST' });
+        const data = await res.json();
+        setReindexMsg(language === 'es' ? `Reindexado: ${data.success} éxitos, ${data.failed} fallos` : `Reindexed: ${data.success} success, ${data.failed} failed`);
+      } catch (e) {
+        setReindexMsg(language === 'es' ? 'Error en reindexado' : 'Reindex failed');
+      } finally {
+        setReindexing(false);
+      }
+    };
+
+    const handleReindexDocs = async () => {
+      if (!confirm(language === 'es' ? '¿Forzar reindexado de documentos KB?' : 'Force reindex KB documents?')) return;
+      setReindexDocsLoading(true);
+      setReindexDocsMsg('');
+      try {
+        const res = await apiFetch('/kb/documents/reindex', { method: 'POST' });
+        const data = await res.json();
+        setReindexDocsMsg(language === 'es' ? `Documentos reindexados: ${data.success || 0} éxitos, ${data.failed || 0} fallos` : `Documents reindexed: ${data.success || 0} success, ${data.failed || 0} failed`);
+      } catch (e) {
+        setReindexDocsMsg(language === 'es' ? 'Error en reindexado de documentos' : 'Documents reindex failed');
+      } finally {
+        setReindexDocsLoading(false);
+      }
+    };
 
   return (
     <Layout>
@@ -104,6 +121,23 @@ export function Settings() {
           )}
         </div>
 
+        <div className="settings-section">
+          <h2 className="settings-section-title">{language === 'es' ? 'Documentos KB' : 'KB Documents'}</h2>
+          <button
+            className="settings-link"
+            onClick={handleReindexDocs}
+            disabled={reindexDocsLoading}
+            style={{ border: 'none', cursor: reindexDocsLoading ? 'not-allowed' : 'pointer', opacity: reindexDocsLoading ? 0.6 : 1 }}
+          >
+            {reindexDocsLoading 
+              ? (language === 'es' ? 'Reindexando documentos...' : 'Reindexing documents...') 
+              : (language === 'es' ? 'Forzar Reindexado de Documentos' : 'Force KB Documents Reindex')}
+          </button>
+          {reindexDocsMsg && (
+            <p className="reindex-msg">{reindexDocsMsg}</p>
+          )}
+        </div>
+        
         <div className="settings-section">
           <h2 className="settings-section-title">
             {language === 'es' ? 'Depuración LLM' : 'LLM Debug Logging'}

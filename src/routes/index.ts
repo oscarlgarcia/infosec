@@ -1,12 +1,14 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import { Setting } from '../db/mongo/models';
 import { generateKnowledgeGraph, getGraphStats } from '../services/knowledgeGraph';
 import { analyzeGap } from '../services/gapFinder';
-import { 
+import {
   uploadDocument, 
   getAllDocuments, 
   deleteDocument,
   searchKnowledgeBase,
-  semanticSearchDocuments 
+  semanticSearchDocuments,
+  reindexDocumentsToChroma,
 } from '../services/kb/knowledge';
 import {
   getAllQA,
@@ -110,6 +112,29 @@ export async function routes(fastify: FastifyInstance) {
   fastify.get('/health', async () => {
     return { status: 'ok', timestamp: new Date().toISOString() };
   });
+
+  // GET /settings/llm-debug - Get LLM debug logging state
+  fastify.get('/settings/llm-debug',
+    { preHandler: [verifyToken] },
+    async () => {
+      const setting = await Setting.findOne({ key: 'llm_debug_logging' });
+      return { enabled: setting?.value === true };
+    }
+  );
+
+  // POST /settings/llm-debug - Update LLM debug logging state
+  fastify.post<{ Body: { enabled: boolean } }>('/settings/llm-debug',
+    { preHandler: [verifyToken, requireRole('admin', 'manager', 'sme')] },
+    async (request, reply) => {
+      const { enabled } = request.body;
+      await Setting.findOneAndUpdate(
+        { key: 'llm_debug_logging' },
+        { key: 'llm_debug_logging', value: enabled, updatedAt: new Date() },
+        { upsert: true }
+      );
+      return { success: true, enabled };
+    }
+  );
 
   fastify.get('/uploads/clients/:filename', async (request, reply) => {
     const filename = (request.params as any).filename;
@@ -850,18 +875,28 @@ export async function routes(fastify: FastifyInstance) {
     }
   );
 
-  // Semantic search for KB documents
-  fastify.get<{ Querystring: { q: string; department?: Department; limit?: number } }>(
-    '/documents/search',
-    { preHandler: [verifyToken] },
-    async (request: FastifyRequest<{ Querystring: { q: string; department?: Department; limit?: number } }>) => {
-      const { q, department, limit } = request.query;
-      if (!q) return [];
-      return semanticSearchDocuments(q, department, limit || 10);
-    }
-  );
+    // Semantic search for KB documents
+    fastify.get<{ Querystring: { q: string; department?: Department; limit?: number } }>(
+      '/documents/search',
+      { preHandler: [verifyToken] },
+      async (request: FastifyRequest<{ Querystring: { q: string; department?: Department; limit?: number } }>) => {
+        const { q, department, limit } = request.query;
+        if (!q) return [];
+        return semanticSearchDocuments(q, department, limit || 10);
+      }
+    );
 
-  // Search - all authenticated users
+    // Reindex documents to ChromaDB
+    fastify.post(
+      '/kb/documents/reindex',
+      { preHandler: [verifyToken, requireRole('admin', 'manager', 'sme')] },
+      async () => {
+        const result = await reindexDocumentsToChroma();
+        return result;
+      }
+    );
+  
+    // Search - all authenticated users
   fastify.get<{ Querystring: { q: string; department?: Department; limit?: number } }>(
     '/search',
     { preHandler: [verifyToken] },

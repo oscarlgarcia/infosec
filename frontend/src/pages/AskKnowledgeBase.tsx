@@ -5,6 +5,7 @@ import { CreateRequestModal } from '../components/CreateRequestModal';
 import { ViewClientModal } from '../components/ViewClientModal';
 import { ViewRequestModal } from '../components/ViewRequestModal';
 import { Layout } from '../components/Layout';
+import { FormattedMessage } from '../components/FormattedMessage';
 import { useApi, API_URL } from '../contexts/AuthContext';
 import '../styles/App.css';
 
@@ -75,17 +76,17 @@ export function AskKnowledgeBase() {
     if (addedMsgIds.has(idx)) return;
     setAddingMsgId(idx);
     try {
-      const userMsg = messages.find((m, i) => i < idx && m.role === 'user');
-      const res = await apiFetch('/kb/candidates', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          question: userMsg?.content || 'From chat',
-          suggestedAnswer: msg.content,
-          sessionId: selectedChatId,
-          clientId: selectedClientId,
-        }),
-      });
+        const userMsg = [...messages.slice(0, idx)].reverse().find(m => m.role === 'user');
+        const res = await apiFetch('/kb/candidates', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            question: userMsg?.content || 'From chat',
+            suggestedAnswer: msg.content,
+            sessionId: selectedChatId,
+            clientId: selectedClientId,
+          }),
+        });
       if (res.ok) {
         setAddedMsgIds(prev => new Set([...prev, idx]));
       }
@@ -538,7 +539,11 @@ const chatContent = (
               <>
                 {messages.map((message, idx) => (
                   <div key={idx} className={`message ${message.role}`}>
-                    <div className="message-content">{message.content}</div>
+                    {message.role === 'assistant' ? (
+                      <FormattedMessage message={message} />
+                    ) : (
+                      <div className="message-content">{message.content}</div>
+                    )}
                     <div className="message-footer">
                       <div className="message-time">
                         {message.timestamp ? new Date(message.timestamp).toLocaleTimeString() : ''}

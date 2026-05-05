@@ -276,4 +276,61 @@ export async function semanticSearchDocuments(
     .slice(0, limit);
 
   return results;
-}
+  }
+
+  export async function reindexDocumentsToChroma(): Promise<{ success: number; failed: number }> {
+    const docs = await DocumentModel.find({}).lean() as any[];
+    console.log(`🔄 Re-indexing ${docs.length} documents to ChromaDB...`);
+    
+    const client = await getChromaClient();
+    
+    try {
+      await client.deleteCollection({ name: CHROMA_COLLECTION });
+      console.log('🗑️ Cleared infosec-kb collection');
+    } catch (e) {
+      console.log('ℹ️ infosec-kb collection did not exist');
+    }
+    
+    const collection = await client.getOrCreateCollection({ name: CHROMA_COLLECTION });
+    
+    let success = 0;
+    let failed = 0;
+    
+    for (const doc of docs) {
+      try {
+        const content = doc.content || '';
+        if (content.length < 5) {
+          failed++;
+          continue;
+        }
+        
+        const embedding = await createOllamaEmbedding(content);
+        if (embedding.length === 0) {
+          failed++;
+          continue;
+        }
+        
+        await collection.add({
+          ids: [doc._id.toString()],
+          embeddings: [embedding],
+          documents: [content],
+          metadatas: [{
+            originalName: doc.originalName || '',
+            department: doc.department || '',
+            source: 'document'
+          }]
+        });
+        
+        success++;
+        if (success % 10 === 0) {
+          console.log(`✅ Indexed ${success}/${docs.length}`);
+        }
+      } catch (err) {
+        console.error(`❌ Failed to index ${doc.originalName}:`, err);
+        failed++;
+      }
+    }
+    
+    console.log(`✅ Documents reindex complete: ${success} success, ${failed} failed`);
+    return { success, failed };
+  }
