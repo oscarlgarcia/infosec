@@ -41,8 +41,9 @@ export function AgentsConfigurator() {
   };
 
   const handleEdit = (agent: Agent) => {
-    if (agent.isSystem) {
-      alert(language === 'es' ? 'No se pueden editar los agentes del sistema' : 'Cannot edit system agents');
+    // Allow editing InfoSec and Standard agents, but not other system agents
+    if (agent.isSystem && agent.name !== 'InfoSec' && agent.name !== 'Standard') {
+      alert(language === 'es' ? 'No se pueden editar este agente del sistema' : 'Cannot edit this system agent');
       return;
     }
     setEditingAgent(agent);
@@ -50,8 +51,9 @@ export function AgentsConfigurator() {
   };
 
   const handleDelete = async (agent: Agent) => {
-    if (agent.isSystem) {
-      alert(language === 'es' ? 'No se pueden eliminar los agentes del sistema' : 'Cannot delete system agents');
+    // Allow deleting Standard agent, but not other system agents except InfoSec
+    if (agent.isSystem && agent.name !== 'Standard' && agent.name !== 'InfoSec') {
+      alert(language === 'es' ? 'No se pueden eliminar este agente del sistema' : 'Cannot delete this system agent');
       return;
     }
     if (!confirm(language === 'es' ? '¿Estás seguro de eliminar este agente?' : 'Are you sure you want to delete this agent?')) return;
@@ -146,7 +148,7 @@ export function AgentsConfigurator() {
                       {agent.isSystem ? (language === 'es' ? 'Sistema' : 'System') : (language === 'es' ? 'Personalizado' : 'Custom')}
                     </td>
                     <td className="actions-cell">
-                      {!agent.isSystem && (
+                      {(agent.name === 'InfoSec' || agent.name === 'Standard' || !agent.isSystem) ? (
                         <>
                           <button 
                             className="btn-edit"
@@ -154,15 +156,23 @@ export function AgentsConfigurator() {
                           >
                             {language === 'es' ? 'Editar' : 'Edit'}
                           </button>
-                          <button 
-                            className="btn-delete"
-                            onClick={() => handleDelete(agent)}
-                          >
-                            {language === 'es' ? 'Eliminar' : 'Delete'}
-                          </button>
+                          {(agent.name === 'Standard' || !agent.isSystem) && (
+                            <button 
+                              className="btn-delete"
+                              onClick={() => handleDelete(agent)}
+                            >
+                              {language === 'es' ? 'Eliminar' : 'Delete'}
+                            </button>
+                          )}
+                          {agent.name === 'InfoSec' && (
+                            <span className="text-muted" style={{marginLeft: '8px'}}>
+                              {language === 'es' ? '(No eliminable)' : '(Not deletable)'}
+                            </span>
+                          )}
                         </>
+                      ) : (
+                        <span className="text-muted">—</span>
                       )}
-                      {agent.isSystem && <span className="text-muted">—</span>}
                     </td>
                   </tr>
                 ))}
