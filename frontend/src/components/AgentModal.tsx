@@ -73,7 +73,7 @@ export function AgentModal({ agent, onSave, onClose }: AgentModalProps) {
     try {
       if (agent) {
         // Update agent
-        await apiFetch(`/agents/${(agent as any)._id || (agent as any).id || agent._id}`, {
+        await apiFetch(`/agents/${String(agent._id || (agent as any)._id || (agent as any).id)}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
