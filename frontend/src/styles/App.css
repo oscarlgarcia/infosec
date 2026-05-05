@@ -1488,6 +1488,7 @@ body {
   font-weight: 700;
   color: var(--gray-900);
   margin-bottom: 32px;
+  grid-column: 1 / -1;
 }
 
 .settings-section {
@@ -1505,6 +1506,33 @@ body {
   font-weight: 600;
   color: var(--gray-800);
   margin-bottom: 16px;
+}
+
+.docs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.doc-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--gray-50);
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.doc-name {
+  font-weight: 500;
+  color: var(--gray-800);
+}
+
+.doc-date {
+  color: var(--gray-500);
+  font-size: 12px;
 }
 
 .language-toggle {

@@ -103,6 +103,7 @@ export const DocumentSchema = new Schema({
     openaiFileId: { type: String },
     vectorStoreIds: [{ type: String }],
   },
+  lastIndexedAt: { type: Date },
 }, { timestamps: true });
 
 export const QAEntrySchema = new Schema({

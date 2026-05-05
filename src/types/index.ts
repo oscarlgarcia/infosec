@@ -101,6 +101,7 @@ export interface Document {
   };
   path?: string;
   createdAt: Date;
+  lastIndexedAt?: Date;
 }
 
 export interface QAEntry {

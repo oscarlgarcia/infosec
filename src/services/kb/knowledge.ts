@@ -172,6 +172,7 @@ export async function getAllDocuments(department?: Department): Promise<DocType[
     embeddingStatus: doc.embeddingStatus,
     embeddingError: doc.embeddingError,
     metadata: doc.metadata,
+    lastIndexedAt: doc.lastIndexedAt,
     path: `/uploads/knowledge/${doc.filename}`,
     createdAt: doc.createdAt,
   }));
@@ -304,8 +305,24 @@ export async function semanticSearchDocuments(
           continue;
         }
         
-        const embedding = await createOllamaEmbedding(content);
+        let embedding: number[] = [];
+        
+        // Try Ollama first, then fallback to OpenAI
+        try {
+          embedding = await createOllamaEmbedding(content);
+          if (embedding.length === 0) {
+            console.log(`⚠️ Empty Ollama embedding for ${doc.originalName}, trying OpenAI...`);
+            const openaiEmbeddings = await createEmbeddings([content]);
+            embedding = openaiEmbeddings[0] || [];
+          }
+        } catch (embedError) {
+          console.error(`❌ Embedding failed for ${doc.originalName}:`, embedError);
+          failed++;
+          continue;
+        }
+        
         if (embedding.length === 0) {
+          console.error(`❌ No embedding generated for ${doc.originalName}`);
           failed++;
           continue;
         }
@@ -320,6 +337,9 @@ export async function semanticSearchDocuments(
             source: 'document'
           }]
         });
+        
+        // Update lastIndexedAt
+        await DocumentModel.findByIdAndUpdate(doc._id, { lastIndexedAt: new Date() });
         
         success++;
         if (success % 10 === 0) {

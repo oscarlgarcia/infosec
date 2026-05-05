@@ -12,7 +12,23 @@ export function Settings() {
   const [reindexMsg, setReindexMsg] = useState('');
   const [reindexDocsLoading, setReindexDocsLoading] = useState(false);
   const [reindexDocsMsg, setReindexDocsMsg] = useState('');
+  const [docs, setDocs] = useState<{id: string; originalName: string; lastIndexedAt?: string}[]>([]);
   const [debugLogging, setDebugLogging] = useState(false);
+
+  useEffect(() => {
+    const fetchDocs = async () => {
+      try {
+        const res = await apiFetch('/kb/documents');
+        if (res.ok) {
+          const data = await res.json();
+          setDocs(data);
+        }
+      } catch (e) {
+        console.error('Failed to fetch documents:', e);
+      }
+    };
+    fetchDocs();
+  }, []);
   const [loading, setLoading] = useState(true);
 
   const toggleLanguage = () => {
@@ -123,6 +139,20 @@ export function Settings() {
 
         <div className="settings-section">
           <h2 className="settings-section-title">{language === 'es' ? 'Documentos KB' : 'KB Documents'}</h2>
+          {docs.length > 0 && (
+            <div className="docs-list">
+              {docs.map((doc) => (
+                <div key={doc.id} className="doc-item">
+                  <span className="doc-name">{doc.originalName}</span>
+                  <span className="doc-date">
+                    {doc.lastIndexedAt 
+                      ? (language === 'es' ? `Reindexado: ${new Date(doc.lastIndexedAt).toLocaleDateString()}` : `Indexed: ${new Date(doc.lastIndexedAt).toLocaleDateString()}`)
+                      : (language === 'es' ? 'No reindexado' : 'Not indexed')}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
           <button
             className="settings-link"
             onClick={handleReindexDocs}
