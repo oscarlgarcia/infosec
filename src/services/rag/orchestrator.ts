@@ -104,11 +104,15 @@ async function buildInstructions(params: {
   console.error('[LLM INPUT] buildInstructions: Using agent: ' + (agent?.name || 'UNKNOWN') + ', instructions length: ' + (agent?.instructions?.length || 0));
   
   // Reemplazar placeholders en el template del agente
+  const passagesText = params.passages.length > 0 
+    ? `=== RECOVERED PASSAGES (USE ONLY THIS INFORMATION) ===\n${params.passages.join('\n\n')}\n=== END OF RECOVERED PASSAGES ===`
+    : '=== NO PASSAGES RECOVERED - DO NOT ANSWER ===';
+  
   return agent!.instructions
     .replace(/\{\{query\}\}/g, params.query)
     .replace(/\{\{sessionSummary\}\}/g, params.sessionSummary || 'No previous summary.')
     .replace(/\{\{rules\}\}/g, params.rules.join('\n') || 'No rules.')
-    .replace(/\{\{passages\}\}/g, params.passages.join('\n\n') || 'No passages recovered.')
+    .replace(/\{\{passages\}\}/g, passagesText)
     .replace(/\{\{metrics\}\}/g, 'Metrics not available yet.'); // Placeholder para futuro
 }
 

@@ -15,17 +15,13 @@ export async function getAgentById(id: string): Promise<IAgent | null> {
   return Agent.findById(id).lean();
 }
 
-// Crear nuevo agente (NO system)
+// Crear nuevo agente
 export async function createAgent(data: {
   name: string;
   displayName: string;
   description?: string;
   instructions: string;
 }): Promise<IAgent> {
-  if (data.name === 'Standard' || data.name === 'InfoSec') {
-    throw new Error('Cannot create system agents');
-  }
-  
   const exists = await Agent.findOne({ name: data.name });
   if (exists) {
     throw new Error(`Agent "${data.name}" already exists`);
@@ -41,7 +37,7 @@ export async function createAgent(data: {
   });
 }
 
-// Actualizar agente (NO system)
+// Actualizar agente (allow InfoSec and Standard)
 export async function updateAgent(id: string, data: Partial<{
   displayName?: string;
   description?: string;
@@ -49,7 +45,9 @@ export async function updateAgent(id: string, data: Partial<{
 }>): Promise<IAgent | null> {
   const agent = await Agent.findById(id);
   if (!agent) throw new Error('Agent not found');
-  if (agent.isSystem) throw new Error('Cannot modify system agents');
+  if (agent.isSystem && agent.name !== 'InfoSec' && agent.name !== 'Standard') {
+    throw new Error('Cannot modify system agents');
+  }
   
   return Agent.findByIdAndUpdate(
     id, 
@@ -58,11 +56,13 @@ export async function updateAgent(id: string, data: Partial<{
   );
 }
 
-// Eliminar agente (soft delete, NO system)
+// Eliminar agente (soft delete, allow Standard)
 export async function deleteAgent(id: string): Promise<IAgent | null> {
   const agent = await Agent.findById(id);
   if (!agent) throw new Error('Agent not found');
-  if (agent.isSystem) throw new Error('Cannot delete system agents');
+  if (agent.isSystem && agent.name !== 'Standard' && agent.name !== 'InfoSec') {
+    throw new Error('Cannot delete system agents');
+  }
   
   return Agent.findByIdAndUpdate(
     id, 
@@ -77,16 +77,16 @@ export async function initializeSystemAgents(): Promise<void> {
     {
       name: 'Standard',
       displayName: 'Standard Assistant',
-      description: 'General purpose assistant',
-      instructions: `You are a helpful assistant. Provide clear and concise answers.\n\nQuery: {{query}}\n\nSession summary: {{sessionSummary}}\n\nResponse format: Clear explanation with examples if needed.\n\nRules:\n{{rules}}\n\nRecovered passages:\n{{passages}}\n\nMetrics: {{metrics}}`,
-      isSystem: true,
+      description: 'General purpose assistant - uses ONLY recovered passages',
+      instructions: `You are a helpful assistant. Your PRIMARY DIRECTIVE is to ONLY use information from the provided "RECOVERED PASSAGES" section below.\n\n=== STRICT CONSTRAINTS ===\n1. ONLY use information from the "RECOVERED PASSAGES" section.\n2. If the passages don't contain the answer, respond EXACTLY: "No tengo información suficiente en la base de conocimientos para responder esta pregunta."\n3. DO NOT use your training data, general knowledge, or external sources.\n4. Every claim must cite a passage like [DOC 1], [Q&A 2], etc.\n=== END CONSTRAINTS ===\n\nQuery: {{query}}\n\nSession summary: {{sessionSummary}}\n\nResponse format: Clear explanation with examples if needed.\n\nRules:\n{{rules}}\n\n=== RECOVERED PASSAGES (USE ONLY THIS INFORMATION) ===\n{{passages}}\n=== END OF RECOVERED PASSAGES ===\n\nMetrics: {{metrics}}`,
+      isSystem: false,  // NOW EDITABLE AND DELETABLE
     },
     {
       name: 'InfoSec',
       displayName: 'InfoSec Specialist',
       description: 'InfoSec knowledge base assistant',
-      instructions: `You are an InfoSec assistant. Respond with evidence and avoid unsupported claims.\n\nTask profile: InfoSec Specialist\n\nQuery: {{query}}\n\nSession summary: {{sessionSummary}}\n\nResponse format: Short answer + evidence bullets.\n\nRules:\n1. All answers must include at least one citation.\n2. If coverage is weak, suggest creating a Q&A.\n{{rules}}\n\nRecovered passages:\n{{passages}}\n\nMetrics: {{metrics}}`,
-      isSystem: true,
+      instructions: `You are an InfoSec assistant. Your PRIMARY DIRECTIVE is to ONLY use information from the provided "RECOVERED PASSAGES" section below.\n\n=== STRICT CONSTRAINTS ===\n1. ONLY use information from the "RECOVERED PASSAGES" section.\n2. If the passages don't contain the answer, respond EXACTLY: "No tengo información suficiente en la base de conocimientos para responder esta pregunta."\n3. DO NOT use your training data, general knowledge, or external sources.\n4. Every claim must cite a passage like [DOC 1], [Q&A 2], etc.\n5. If you mention something NOT in the passages, you are violating your core directive.\n=== END CONSTRAINTS ===\n\nTask profile: InfoSec Specialist\n\nQuery: {{query}}\n\nSession summary: {{sessionSummary}}\n\nResponse format: Short answer + evidence bullets.\n\nRules:\n1. All answers must include at least one citation.\n2. If coverage is weak, suggest creating a Q&A.\n{{rules}}\n\n=== RECOVERED PASSAGES (USE ONLY THIS INFORMATION) ===\n{{passages}}\n=== END OF RECOVERED PASSAGES ===\n\nMetrics: {{metrics}}`,
+      isSystem: false,  // NOW EDITABLE
     },
     {
       name: 'Gap Analysis',

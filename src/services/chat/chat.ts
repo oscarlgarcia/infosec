@@ -383,10 +383,10 @@ export async function sendMessage(
     responseContent = ragResponse.answer_text;
     // NO appendear citas y flags al contenido - se pasan como metadata
   } catch (error) {
-    console.error('[LLM INPUT] sendMessage: runChatQuery FAILED, falling back to processQuestion. Error: ' + error.message);
-    const agentResponse = await processQuestion(userMessage, agent);
-    responseContent = agentResponse.content;
-    // NO appendear información adicional al contenido
+    console.error('[LLM INPUT] sendMessage: runChatQuery FAILED: ' + error.message);
+    // NO fallback to processQuestion - it doesn't use RAG properly
+    // Return error message instead
+    responseContent = 'Error: No se pudo generar una respuesta. Por favor intente nuevamente.';
   }
 
   const assistantMsg: Message = {

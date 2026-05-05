@@ -28,7 +28,7 @@ export interface ChatOptions {
 }
 
 export async function chat(options: ChatOptions): Promise<string> {
-  const { messages, model = 'qwen2.5:latest', temperature = 0.7, maxTokens = 4000 } = options;
+  const { messages, model = 'qwen2.5:latest', temperature = 0.3, maxTokens = 4000 } = options;
   
   // DEBUG: Log LLM inputs
   console.error('[LLM INPUT] Model: ' + model);
