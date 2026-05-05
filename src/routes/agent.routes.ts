@@ -76,9 +76,9 @@ export async function agentRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // DELETE /agents/:id - Desactivar agente (solo admin, NO system)
+  // DELETE /agents/:id - Desactivar agente (admin, sme, NO system)
   fastify.delete<{ Params: { id: string } }>('/agents/:id', {
-    preHandler: [verifyToken, requireRole('admin')],
+    preHandler: [verifyToken, requireRole('admin', 'sme')],
   }, async (request, reply) => {
     try {
       const deleted = await deleteAgent(request.params.id);
