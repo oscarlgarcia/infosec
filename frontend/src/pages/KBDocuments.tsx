@@ -34,7 +34,7 @@ export function KBDocumentsPage() {
 
   const fetchDocuments = async (department?: string) => {
     setIsLoading(true);
-    const url = department ? `/documents?department=${encodeURIComponent(department)}` : '/documents';
+    const url = department ? `/kb/documents?department=${encodeURIComponent(department)}` : '/kb/documents';
     const res = await apiFetch(url);
     if (res.ok) {
       const data = await res.json();
@@ -47,7 +47,7 @@ export function KBDocumentsPage() {
     if (!window.confirm(language === 'es' ? '¿Eliminar documento?' : 'Delete document?')) {
       return;
     }
-    const res = await apiFetch(`/documents/${id}`, { method: 'DELETE' });
+    const res = await apiFetch(`/kb/documents/${id}`, { method: 'DELETE' });
     if (res.ok) {
       await fetchDocuments(filter || undefined);
     }
