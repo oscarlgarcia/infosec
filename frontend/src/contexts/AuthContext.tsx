@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { AuthState, LoginCredentials, AuthResponse } from '../types';
 
-export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 const STORAGE_KEYS = {
   ACCESS_TOKEN: 'auth_access_token',
