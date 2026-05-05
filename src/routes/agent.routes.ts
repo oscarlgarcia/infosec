@@ -40,9 +40,9 @@ export async function agentRoutes(fastify: FastifyInstance) {
     return agent;
   });
 
-  // POST /agents - Crear nuevo agente (solo admin/manager)
+  // POST /agents - Crear nuevo agente (admin, manager, sme)
   fastify.post<{ Body: { name: string; displayName: string; description?: string; instructions: string } }>('/agents', {
-    preHandler: [verifyToken, requireRole('admin', 'manager')],
+    preHandler: [verifyToken, requireRole('admin', 'manager', 'sme')],
   }, async (request, reply) => {
     try {
       const newAgent = await createAgent(request.body);
