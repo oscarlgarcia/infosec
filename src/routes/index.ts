@@ -889,8 +889,11 @@ export async function routes(fastify: FastifyInstance) {
     // Reindex documents to ChromaDB
     fastify.post(
       '/kb/documents/reindex',
-      { preHandler: [verifyToken, requireRole('admin', 'manager', 'sme')] },
-      async () => {
+      {
+        preHandler: [verifyToken, requireRole('admin', 'manager', 'sme')],
+        config: { rawBody: true }
+      },
+      async (request, reply) => {
         const result = await reindexDocumentsToChroma();
         return result;
       }

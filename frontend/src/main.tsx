@@ -13,6 +13,7 @@ import { ProtectedRoute } from './components/ProtectedRoute'
 import { UserHome } from './pages/UserHome'
 import { SmeManagerHome } from './pages/SmeManagerHome'
 import { AdminHome } from './pages/AdminHome'
+import { RoleBasedHome } from './pages/RoleBasedHome'
 import { QAPage } from './pages/QA'
 import { KnowledgeBasePage } from './pages/KnowledgeBase'
 import { KBDocumentsPage } from './pages/KBDocuments'
@@ -38,7 +39,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
               path="/app"
               element={
                 <ProtectedRoute>
-                  <AdminHome />
+                  <RoleBasedHome />
                 </ProtectedRoute>
               }
             />

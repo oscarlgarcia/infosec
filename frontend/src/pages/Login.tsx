@@ -21,12 +21,8 @@ export function LoginPage() {
       const user = await login({ username, password });
       const role = (user as any)?.role || 'usuario';
       
-      if (role === 'admin') {
+      if (role === 'admin' || role === 'manager' || role === 'sme') {
         navigate('/app', { replace: true });
-      } else if (role === 'sme') {
-        navigate('/chat', { replace: true });
-      } else if (role === 'manager') {
-        navigate('/chat', { replace: true });
       } else {
         navigate('/app', { replace: true });
       }

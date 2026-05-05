@@ -33,13 +33,16 @@ export async function verifyToken(
   }
 }
 
-export function requireRole(...roles: UserRole[]) {
+ export function requireRole(...roles: UserRole[]) {
   return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
     if (!request.user) {
       return reply.code(401).send({ error: 'Unauthorized', message: 'Authentication required' });
     }
 
+    console.log(`requireRole check: user=${request.user.username}, role=${request.user.role}, required=${roles.join(',')}`);
+
     if (!roles.includes(request.user.role as UserRole)) {
+      console.log(`requireRole DENIED: user=${request.user.username}, role=${request.user.role}, required=${roles.join(',')}`);
       return reply.code(403).send({ 
         error: 'Forbidden', 
         message: `Access denied. Required roles: ${roles.join(', ')}` 

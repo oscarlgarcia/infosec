@@ -31,7 +31,7 @@ export function KBEmbeddingsPage() {
 
   const fetchDocuments = async (department?: string) => {
     setIsLoading(true);
-    const url = department ? `/documents?department=${encodeURIComponent(department)}` : '/documents';
+    const url = department ? `/kb/documents?department=${encodeURIComponent(department)}` : '/kb/documents';
     const res = await apiFetch(url);
     if (res.ok) {
       const data = await res.json();

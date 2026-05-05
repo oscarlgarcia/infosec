@@ -46,7 +46,7 @@ server {
     add_header X-Frame-Options "SAMEORIGIN";
     
     # Proxy API requests to backend - catch all API routes
-    location ~ ^/(api|auth|agents|rules|clients|conversations|knowledge-base|kb|cms|qa|gap-finder|answer-builder|analytics|contradiction-analyzer|knowledge-graph|settings)(/|$) {
+    location ~ ^/(api|auth|agents|rules|clients|conversations|knowledge-base|kb|cms|qa|gap-finder|answer-builder|analytics|contradiction-analyzer|knowledge-graph)/ {
         proxy_pass http://infosec-backend:3000;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;

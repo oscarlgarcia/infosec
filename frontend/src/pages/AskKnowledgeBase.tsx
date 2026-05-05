@@ -373,6 +373,22 @@ const handleCreateRequest = async (clientId: string, data: { requestType: string
     });
   };
 
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (err) {
+      console.error('Failed to copy text: ', err);
+    }
+  };
+
+  const bringToInput = (text: string) => {
+    setInputValue(text);
+    setTimeout(() => {
+      const textarea = document.querySelector('.chat-input') as HTMLTextAreaElement;
+      if (textarea) textarea.focus();
+    }, 0);
+  };
+
   const sidebarContent = (
     <>
       <div className="sidebar-header">
@@ -548,16 +564,45 @@ const chatContent = (
                       <div className="message-time">
                         {message.timestamp ? new Date(message.timestamp).toLocaleTimeString() : ''}
                       </div>
-                      {message.role === 'assistant' && (
-                        <button
-                          className={`msg-add-kb-btn ${addedMsgIds.has(idx) ? 'added' : ''}`}
-                          onClick={() => handleAddMsgToKB(message, idx)}
-                          disabled={addingMsgId === idx}
-                          title="Add to KB Candidates"
-                        >
-                          {addedMsgIds.has(idx) ? '✓' : '+'}
-                        </button>
-                      )}
+                      <div className="message-actions">
+                        {message.role === 'user' && (
+                          <>
+                            <button
+                              className="msg-action-btn"
+                              onClick={() => copyToClipboard(message.content)}
+                              title="Copiar al portapapeles"
+                            >
+                              📋
+                            </button>
+                            <button
+                              className="msg-action-btn"
+                              onClick={() => bringToInput(message.content)}
+                              title="Llevar al chat input"
+                            >
+                              ✏️
+                            </button>
+                          </>
+                        )}
+                        {message.role === 'assistant' && (
+                          <button
+                            className="msg-action-btn"
+                            onClick={() => copyToClipboard(message.content)}
+                            title="Copiar respuesta"
+                          >
+                            📋
+                          </button>
+                        )}
+                        {message.role === 'assistant' && (
+                          <button
+                            className={`msg-add-kb-btn ${addedMsgIds.has(idx) ? 'added' : ''}`}
+                            onClick={() => handleAddMsgToKB(message, idx)}
+                            disabled={addingMsgId === idx}
+                            title="Add to KB Candidates"
+                          >
+                            {addedMsgIds.has(idx) ? '✓' : '+'}
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}

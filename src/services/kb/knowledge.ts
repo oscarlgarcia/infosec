@@ -286,17 +286,6 @@ export async function semanticSearchDocuments(
     
     console.log(`🔄 Re-indexing ${docs.length} documents to ChromaDB...`);
     
-    const client = await getChromaClient();
-    
-    try {
-      await client.deleteCollection({ name: CHROMA_COLLECTION });
-      console.log('🗑️ Cleared infosec-kb collection');
-    } catch (e) {
-      console.log('ℹ️ infosec-kb collection did not exist');
-    }
-    
-    const collection = await client.getOrCreateCollection({ name: CHROMA_COLLECTION });
-    
     let success = 0;
     let failed = 0;
     const batchSize = 10;
@@ -319,16 +308,17 @@ export async function semanticSearchDocuments(
           continue;
         }
         
-        await collection.add({
-          ids: validItems.map(item => item.doc._id.toString()),
-          embeddings: validItems.map(item => item.embedding),
-          documents: validItems.map(item => item.content),
-          metadatas: validItems.map(item => ({
+        await addToCollection(
+          CHROMA_COLLECTION,
+          validItems.map(item => item.doc._id.toString()),
+          validItems.map(item => item.embedding),
+          validItems.map(item => item.content),
+          validItems.map(item => ({
             originalName: item.doc.originalName || '',
             department: item.doc.department || '',
             source: 'document'
           }))
-        });
+        );
         
         // Update lastIndexedAt for all successfully indexed docs
         const ids = validItems.map(item => item.doc._id);
@@ -340,7 +330,6 @@ export async function semanticSearchDocuments(
         success += validItems.length;
         failed += (batch.length - validItems.length);
         
-        console.log(`✅ Indexed ${success}/${docs.length}`);
       } catch (err) {
         console.error(`❌ Failed to index batch starting at ${i}:`, err);
         failed += batch.length;
