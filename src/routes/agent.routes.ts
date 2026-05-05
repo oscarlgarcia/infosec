@@ -58,7 +58,7 @@ export async function agentRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // PUT /agents/:id - Actualizar agente (solo admin/manager, NO system)
+  // PUT /agents/:id - Actualizar agente (solo admin/manager, allow InfoSec/Standard)
   fastify.put<{ Params: { id: string }; Body: { displayName?: string; description?: string; instructions?: string } }>('/agents/:id', {
     preHandler: [verifyToken, requireRole('admin', 'manager')],
   }, async (request, reply) => {
