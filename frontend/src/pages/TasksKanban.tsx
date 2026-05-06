@@ -5,6 +5,7 @@ import { Layout } from '../components/Layout';
 import { TaskCard } from '../components/TaskCard';
 import { TaskModal } from '../components/TaskModal';
 import type { Task, TaskList } from '../types';
+import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
 
 export function TasksKanban() {
   const { language } = useLanguage();
@@ -17,7 +18,34 @@ export function TasksKanban() {
   const [editingListId, setEditingListId] = useState<string | null>(null);
   const [editingListName, setEditingListName] = useState('');
   const [newListName, setNewListName] = useState('');
+  
+  const handleDragEnd = async (result: DropResult) => {
+    const { destination } = result;
+    if (!destination) return;
 
+    // Handle task dragging between lists
+    const sourceListId = result.source.droppableId;
+    const destListId = destination.droppableId;
+    
+    // Find task being dragged
+    const taskId = result.draggableId;
+    const task = tasks.find(t => (t._id || (t as any).id) === taskId);
+    if (!task) return;
+    
+    // Update task's listId
+    const newListId = destListId === 'lists' ? task.listId : destListId;
+    
+    try {
+      await apiFetch(`/tasks/${taskId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ listId: newListId }),
+      });
+      await loadData();
+    } catch (err: any) {
+      alert(`${language === 'es' ? 'Error:' : 'Error:'} ${err.message}`);
+    }
+  };
   const loadData = useCallback(async () => {
     try {
       const [listsRes, tasksRes] = await Promise.all([
@@ -115,52 +143,72 @@ export function TasksKanban() {
           </div>
         </div>
 
-        <div className="kanban-board">
-          {lists.map((list: any) => (
-            <div key={list._id} className="kanban-list">
-              <div className="kanban-list-header">
-                {editingListId === list._id ? (
-                  <input
-                    className="list-name-input"
-                    value={editingListName}
-                    onChange={(e) => setEditingListName(e.target.value)}
-                    onBlur={() => handleEditListName(list._id)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleEditListName(list._id);
-                      if (e.key === 'Escape') setEditingListId(null);
-                    }}
-                    autoFocus
-                  />
-                ) : (
-                  <span
-                    onDoubleClick={() => {
-                      setEditingListId(list._id);
-                      setEditingListName(list.name);
-                    }}
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <div className="kanban-board">
+          {lists.map((list: any, index: number) => (
+              <div key={list._id} className="kanban-list">
+                <div className="kanban-list-header">
+                  {editingListId === list._id ? (
+                    <input
+                      className="list-name-input"
+                      value={editingListName}
+                      onChange={(e) => setEditingListName(e.target.value)}
+                      onBlur={() => handleEditListName(list._id)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleEditListName(list._id);
+                        if (e.key === 'Escape') setEditingListId(null);
+                      }}
+                      autoFocus
+                    />
+                  ) : (
+                    <span
+                      onDoubleClick={() => {
+                        setEditingListId(list._id);
+                        setEditingListName(list.name);
+                      }}
+                    >
+                      {list.name}
+                    </span>
+                  )}
+                  <button
+                    className="btn-delete"
+                    onClick={() => handleDeleteList(list._id, list.name)}
                   >
-                    {list.name}
-                  </span>
-                )}
-                <button
-                  className="btn-delete"
-                  onClick={() => handleDeleteList(list._id, list.name)}
-                >
-                  🗑️
-                </button>
+                    🗑️
+                  </button>
+                </div>
+                <Droppable droppableId={list._id}>
+                  {(provided) => (
+                    <div 
+                      className="kanban-list-tasks"
+                      ref={provided.innerRef}
+                      {...provided.droppableProps}
+                    >
+                      {getTasksForList(list._id).map((task: any, taskIndex: number) => (
+                        <Draggable key={task._id || task.id} draggableId={task._id || task.id} index={taskIndex}>
+                          {(provided) => (
+                            <div
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              {...provided.dragHandleProps}
+                            >
+                              <TaskCard
+                                task={task}
+                                onEdit={() => { setEditingTask(task); setShowModal(true); }}
+                                onDelete={() => handleDeleteTask(task)}
+                              />
+                            </div>
+                          )}
+                        </Draggable>
+                      ))}
+                      {provided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
               </div>
-              <div className="kanban-list-tasks">
-                {getTasksForList(list._id).map((task: any) => (
-                  <TaskCard
-                    key={task._id || task.id}
-                    task={task}
-                    onEdit={() => { setEditingTask(task); setShowModal(true); }}
-                    onDelete={() => handleDeleteTask(task)}
-                  />
-                ))}
-              </div>
-            </div>
           ))}
-        </div>
+          </div>
+        </DragDropContext>
 
         {showModal && (
           <TaskModal

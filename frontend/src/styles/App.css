@@ -4735,13 +4735,14 @@ body {
 .kanban-list {
   min-width: 280px;
   max-width: 320px;
-  background: var(--gray-100);
+  background: var(--surface);
   border-radius: 12px;
   padding: 16px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
   max-height: 100%;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .kanban-list-header {
@@ -4750,6 +4751,11 @@ body {
   gap: 8px;
   margin-bottom: 12px;
   flex-shrink: 0;
+  cursor: grab;
+}
+
+.kanban-list-header:active {
+  cursor: grabbing;
 }
 
 .kanban-list-header span {
