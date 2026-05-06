@@ -61,8 +61,9 @@ export function Layout({ children, sidebarContent }: LayoutProps) {
       links.push({ path: '/gap-finder', label: 'Gap Finder', icon: 'GF' });
     }
 
-    links.push({ path: '/knowledge-base', label: t('knowledgeBase') || 'Knowledge Base', icon: 'KB' });
-    links.push({ path: '/settings', label: t('settings') || 'Settings', icon: 'S' });
+      links.push({ path: '/knowledge-base', label: t('knowledgeBase') || 'Knowledge Base', icon: 'KB' });
+      links.push({ path: '/tasks', label: language === 'es' ? 'Tareas' : 'Tasks', icon: 'TK' });
+      links.push({ path: '/settings', label: t('settings') || 'Settings', icon: 'S' });
 
     if (user.role === 'admin') {
       links[0] = { path: '/app', label: language === 'es' ? 'Dashboard' : 'Dashboard', icon: 'D' };

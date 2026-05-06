@@ -103,6 +103,29 @@ export interface AnswerRule {
   updatedAt?: string;
 }
 
+export interface TaskList {
+  _id: string;
+  name: string;
+  order: number;
+  isDefault: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Task {
+  _id: string;
+  name: string;
+  description?: string;
+  status: 'Not Started' | 'In Progress' | 'Completed';
+  dueDate?: string;
+  startDate?: string;
+  createdAt: string;
+  listId: TaskList | string;
+  requestId?: any;
+  checklist: Array<{ text: string; completed: boolean; order: number }>;
+  labelIds: Array<{ _id: string; name: string; color: string }> | string[];
+}
+
 export type UserRole = 'admin' | 'manager' | 'sme' | 'usuario';
 
 export interface User {

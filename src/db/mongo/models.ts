@@ -412,3 +412,37 @@ export const QuestionCoverage = mongoose.model('QuestionCoverage', QuestionCover
 export const DocumentUsage = mongoose.model('DocumentUsage', DocumentUsageSchema);
 export const GapBacklog = mongoose.model('GapBacklog', GapBacklogSchema);
 export const AnswerBuilderJob = mongoose.model('AnswerBuilderJob', AnswerBuilderJobSchema);
+
+// Task Kanban Models
+export const TaskListSchema = new Schema({
+  name: { type: String, required: true },
+  order: { type: Number, default: 0 },
+  isDefault: { type: Boolean, default: false },
+}, { timestamps: true });
+export const TaskList = mongoose.model('TaskList', TaskListSchema);
+
+export const TaskLabelSchema = new Schema({
+  name: { type: String, required: true },
+  color: { type: String, default: '#6B7280' },
+}, { timestamps: true });
+export const TaskLabel = mongoose.model('TaskLabel', TaskLabelSchema);
+
+export const ChecklistItemSchema = new Schema({
+  text: { type: String, required: true },
+  completed: { type: Boolean, default: false },
+  order: { type: Number, default: 0 },
+});
+
+export const TaskSchema = new Schema({
+  name: { type: String, required: true },
+  description: { type: String },
+  status: { type: String, enum: ['Not Started', 'In Progress', 'Completed'], default: 'Not Started' },
+  dueDate: { type: Date },
+  startDate: { type: Date },
+  createdAt: { type: Date, default: Date.now },
+  listId: { type: Schema.Types.ObjectId, ref: 'TaskList', required: true },
+  requestId: { type: Schema.Types.ObjectId, ref: 'ClientRequest' },
+  checklist: [ChecklistItemSchema],
+  labelIds: [{ type: Schema.Types.ObjectId, ref: 'TaskLabel' }],
+}, { timestamps: true });
+export const Task = mongoose.model('Task', TaskSchema);

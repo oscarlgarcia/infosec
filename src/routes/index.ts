@@ -1406,4 +1406,8 @@ fastify.get<{ Querystring: { q: string; topK?: number } }>(
 
   // Agent routes
   fastify.register(agentRoutes);
+
+  // Task Kanban routes
+  const { taskRoutes } = await import('./task.routes');
+  fastify.register(taskRoutes);
 }

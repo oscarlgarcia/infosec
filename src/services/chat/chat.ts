@@ -6,6 +6,8 @@ import { processQuestion } from '../agent/infosec-agent';
 import { newId } from '../../utils/ids';
 import { runChatQuery } from '../rag/orchestrator';
 import type { Conversation as ConversationType, Message, Client as ClientType, Attachment, ClientRequest as ClientRequestType } from '../../types';
+import { createTask, getTasks } from '../tasks/task.service';
+import { getLists } from '../tasks/list.service';
 
 const UPLOAD_DIR = path.join(process.cwd(), 'uploads', 'clients');
 
@@ -139,7 +141,29 @@ export async function createClientRequest(data: {
     status: 'open',
   });
 
-return {
+  // Auto-create Task in TODO list
+  try {
+    const lists = await getLists();
+    const todoList = lists.find((l: any) => l.name === 'TODO');
+    if (todoList && client) {
+      await createTask({
+        name: `${client.name} - ${data.requestType}`,
+        description: data.sectionToReview || '',
+        dueDate: deadlineDate,
+        listId: todoList._id.toString(),
+        requestId: request._id.toString(),
+        checklist: [
+          { text: 'Review', completed: false, order: 0 },
+          { text: 'Assign to Team', completed: false, order: 1 },
+          { text: 'Respond', completed: false, order: 2 },
+        ],
+      });
+    }
+  } catch (err) {
+    console.error('Error auto-creating task:', err);
+  }
+  
+  return {
     id: (request as any)._id.toString(),
     clientId: request.clientId.toString(),
     requestKey: request.requestKey,

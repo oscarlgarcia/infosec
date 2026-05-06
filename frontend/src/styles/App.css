@@ -4677,3 +4677,276 @@ body {
   background: rgba(255, 255, 255, 0.3);
 }
 
+/* Kanban Board */
+.kanban-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.kanban-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  background: white;
+  border-bottom: 1px solid var(--gray-200);
+  flex-shrink: 0;
+}
+
+.kanban-header h1 {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--gray-900);
+}
+
+.new-list-form {
+  display: flex;
+  gap: 8px;
+}
+
+.new-list-form input {
+  padding: 8px 12px;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.new-list-form button {
+  padding: 8px 16px;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.kanban-board {
+  display: flex;
+  gap: 16px;
+  padding: 20px;
+  overflow-x: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.kanban-list {
+  min-width: 280px;
+  max-width: 320px;
+  background: var(--gray-100);
+  border-radius: 12px;
+  padding: 16px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  max-height: 100%;
+}
+
+.kanban-list-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+.kanban-list-header span {
+  flex: 1;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--gray-800);
+  cursor: text;
+}
+
+.list-name-input {
+  flex: 1;
+  padding: 4px 8px;
+  border: 1px solid var(--primary);
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.kanban-list-tasks {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.task-card {
+  background: white;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: box-shadow 0.2s;
+  border: 1px solid var(--gray-200);
+}
+
+.task-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.task-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.task-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gray-900);
+  flex: 1;
+}
+
+.task-description {
+  font-size: 12px;
+  color: var(--gray-600);
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.task-labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.task-label {
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  color: white;
+  cursor: pointer;
+}
+
+.task-label.selected {
+  box-shadow: 0 0 0 2px var(--primary);
+}
+
+.checklist-progress {
+  font-size: 11px;
+  color: var(--gray-600);
+  margin-bottom: 6px;
+}
+
+.task-due-date {
+  font-size: 11px;
+  color: var(--gray-600);
+}
+
+.task-due-date.overdue {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.task-status {
+  font-size: 11px;
+  color: var(--gray-500);
+  margin-top: 6px;
+}
+
+.btn-delete {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+  padding: 2px 4px;
+}
+
+.btn-delete:hover {
+  opacity: 1;
+}
+
+/* Task Modal */
+.labels-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.new-label-form {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  align-items: center;
+}
+
+.new-label-form input[type="text"] {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid var(--gray-300);
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.new-label-form input[type="color"] {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--gray-300);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.new-label-form button {
+  padding: 6px 12px;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.checklist-items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.checklist-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.checklist-item span.completed {
+  text-decoration: line-through;
+  color: var(--gray-400);
+}
+
+.new-checklist-form {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.new-checklist-form input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid var(--gray-300);
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.new-checklist-form button {
+  padding: 6px 12px;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+
