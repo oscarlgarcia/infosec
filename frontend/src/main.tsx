@@ -26,6 +26,7 @@ import { KnowledgeGraphPage } from './pages/KnowledgeGraph'
 import { GapFinderPage } from './pages/GapFinder'
 import { AgentsConfigurator } from './pages/AgentsConfigurator'
 import { RulesManager } from './pages/RulesManager'
+import { TasksKanban } from './pages/TasksKanban'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
@@ -168,6 +169,14 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
               element={
                 <ProtectedRoute>
                   <RulesManager />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/tasks"
+              element={
+                <ProtectedRoute>
+                  <TasksKanban />
                 </ProtectedRoute>
               }
             />

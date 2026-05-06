@@ -24,7 +24,13 @@ import {
 
 export async function taskRoutes(fastify: FastifyInstance) {
   // Initialize default lists on startup
-  await initializeDefaultLists();
+  fastify.addHook('onReady', async () => {
+    try {
+      await initializeDefaultLists();
+    } catch (err) {
+      fastify.log.error('Error initializing default lists:', err);
+    }
+  });
 
   // Task Lists
   fastify.get('/task-lists', { preHandler: [verifyToken] }, async () => {
@@ -52,7 +58,7 @@ export async function taskRoutes(fastify: FastifyInstance) {
 
   fastify.delete<{ Params: { id: string } }>(
     '/task-lists/:id',
-    { preHandler: [verifyToken, requireRole('admin', 'manager')] },
+    { preHandler: [verifyToken, requireRole('admin', 'manager', 'sme')] },
     async (request, reply) => {
       try {
         await deleteList(request.params.id);
