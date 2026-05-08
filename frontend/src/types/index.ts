@@ -337,6 +337,20 @@ export interface AnalyticsClientOverview {
   top_domains: Array<{ domain: string; count: number }>;
 }
 
+// Agent Performance
+export interface AnalyticsAgentPerformance {
+  windowDays: number;
+  agents: Array<{
+    agent: string;
+    queries: number;
+    avg_confidence: number;
+    avg_latency_ms: number;
+    acceptance_rate: number;
+    total_tokens: number;
+    cost_estimate: number;
+  }>;
+}
+
 export interface ContradictionAnalysisResponse {
   question: string;
   domain: string;
@@ -363,4 +377,72 @@ export interface KbCandidate {
   reviewNote?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+// Temporal Patterns
+export interface AnalyticsTemporalPatterns {
+  windowDays: number;
+  by_hour: Array<{ hour: number; count: number }>;
+  by_day_of_week: Array<{ day: string; count: number }>;
+  avg_gap_seconds: number;
+  peak_hour: number;
+}
+
+// Client Activity
+export interface AnalyticsClientActivity {
+  windowDays: number;
+  top_clients: Array<{
+    client_id: string;
+    name: string;
+    client_type: string;
+    queries: number;
+    sessions: number;
+    avg_queries_per_session: number;
+  }>;
+  at_risk_clients: number;
+  by_client_type: Array<{ type: string; count: number }>;
+  total_active_clients: number;
+}
+
+// Request Metrics
+export interface AnalyticsRequestMetrics {
+  windowDays: number;
+  total_requests: number;
+  by_type: Array<{ type: string; count: number }>;
+  by_status: Array<{ status: string; count: number }>;
+  sla_compliance_pct: number;
+  overdue_count: number;
+  avg_resolution_days: number;
+  workload_by_owner: Array<{ owner: string; count: number }>;
+}
+
+// Kanban Metrics
+export interface AnalyticsKanbanMetrics {
+  windowDays: number;
+  total_tasks: number;
+  throughput_weekly: Array<{ week: string; count: number }>;
+  overdue_count: number;
+  by_status: Array<{ status: string; count: number }>;
+  avg_time_by_status: Array<{ status: string; avg_days: number }>;
+  bottleneck: { list: string; count: number };
+}
+
+// Metric Configuration
+export interface MetricConfiguration {
+  _id: string;
+  metricId: string;
+  name: string;
+  nameEs?: string;
+  description?: string;
+  category: 'temporal' | 'client' | 'request' | 'kanban' | 'agent';
+  endpoint: string;
+  chartType: 'line' | 'bar' | 'pie' | 'heatmap' | 'stat';
+  isActive: boolean;
+  order: number;
+  thresholds?: {
+    warning?: number;
+    critical?: number;
+  };
+  createdAt?: string;
+  updatedAt?: string;
 }

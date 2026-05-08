@@ -27,6 +27,7 @@ import { GapFinderPage } from './pages/GapFinder'
 import { AgentsConfigurator } from './pages/AgentsConfigurator'
 import { RulesManager } from './pages/RulesManager'
 import { TasksKanban } from './pages/TasksKanban'
+import { MetricsConfigurator } from './pages/MetricsConfigurator'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
@@ -177,6 +178,14 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
               element={
                 <ProtectedRoute>
                   <TasksKanban />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/metrics-config"
+              element={
+                <ProtectedRoute>
+                  <MetricsConfigurator />
                 </ProtectedRoute>
               }
             />

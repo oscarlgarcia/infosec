@@ -2970,6 +2970,8 @@ body {
   padding: 24px;
   max-width: 1400px;
   margin: 0 auto;
+  overflow-y: auto;
+  height: 100%;
 }
 
 .analytics-header {

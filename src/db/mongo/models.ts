@@ -18,7 +18,7 @@ SettingSchema.pre('save', function(next) {
   next();
 });
 
-export const Setting = mongoose.model<ISetting>('Setting', SettingSchema);
+export const Setting = mongoose.models.Setting || mongoose.model<ISetting>('Setting', SettingSchema);
 
 export const MessageSchema = new Schema({
   role: { type: String, enum: ['user', 'assistant', 'system'], required: true },
@@ -384,34 +384,34 @@ export const AnswerBuilderJobSchema = new Schema({
 }, { timestamps: true });
 
 // Export models
-export const Client = mongoose.model('Client', ClientSchema);
-export const ClientRequest = mongoose.model('ClientRequest', ClientRequestSchema);
-export const Conversation = mongoose.model('Conversation', ConversationSchema);
-export const DocumentModel = mongoose.model('Document', DocumentSchema);
-export const QAEntry = mongoose.model('QAEntry', QAEntrySchema);
+export const Client = mongoose.models.Client || mongoose.model('Client', ClientSchema);
+export const ClientRequest = mongoose.models.ClientRequest || mongoose.model('ClientRequest', ClientRequestSchema);
+export const Conversation = mongoose.models.Conversation || mongoose.model('Conversation', ConversationSchema);
+export const DocumentModel = mongoose.models.Document || mongoose.model('Document', DocumentSchema);
+export const QAEntry = mongoose.models.QAEntry || mongoose.model('QAEntry', QAEntrySchema);
 
 // CMS Models
-export const Category = mongoose.model('Category', CategorySchema);
-export const Tag = mongoose.model('Tag', TagSchema);
-export const ContentPage = mongoose.model('ContentPage', ContentPageSchema);
-export const Bookmark = mongoose.model('Bookmark', BookmarkSchema);
-export const RecentAccess = mongoose.model('RecentAccess', RecentAccessSchema);
-export const FAQ = mongoose.model('FAQ', FAQSchema);
-export const KnowledgeBookmark = mongoose.model('KnowledgeBookmark', KnowledgeBookmarkSchema);
-export const KnowledgeRecentAccess = mongoose.model('KnowledgeRecentAccess', KnowledgeRecentAccessSchema);
+export const Category = mongoose.models.Category || mongoose.model('Category', CategorySchema);
+export const Tag = mongoose.models.Tag || mongoose.model('Tag', TagSchema);
+export const ContentPage = mongoose.models.ContentPage || mongoose.model('ContentPage', ContentPageSchema);
+export const Bookmark = mongoose.models.Bookmark || mongoose.model('Bookmark', BookmarkSchema);
+export const RecentAccess = mongoose.models.RecentAccess || mongoose.model('RecentAccess', RecentAccessSchema);
+export const FAQ = mongoose.models.FAQ || mongoose.model('FAQ', FAQSchema);
+export const KnowledgeBookmark = mongoose.models.KnowledgeBookmark || mongoose.model('KnowledgeBookmark', KnowledgeBookmarkSchema);
+export const KnowledgeRecentAccess = mongoose.models.KnowledgeRecentAccess || mongoose.model('KnowledgeRecentAccess', KnowledgeRecentAccessSchema);
 
 // Auth Models
-export const User = mongoose.model('User', UserSchema);
-export const SessionSummary = mongoose.model('SessionSummary', SessionSummarySchema);
-export const AnswerRule = mongoose.model('AnswerRule', AnswerRuleSchema);
-export const CanonicalAnswer = mongoose.model('CanonicalAnswer', CanonicalAnswerSchema);
-export const KbCandidate = mongoose.model('KbCandidate', KbCandidateSchema);
-export const ResponseTrace = mongoose.model('ResponseTrace', ResponseTraceSchema);
-export const AnalyticsEvent = mongoose.model('AnalyticsEvent', AnalyticsEventSchema);
-export const QuestionCoverage = mongoose.model('QuestionCoverage', QuestionCoverageSchema);
-export const DocumentUsage = mongoose.model('DocumentUsage', DocumentUsageSchema);
-export const GapBacklog = mongoose.model('GapBacklog', GapBacklogSchema);
-export const AnswerBuilderJob = mongoose.model('AnswerBuilderJob', AnswerBuilderJobSchema);
+export const User = mongoose.models.User || mongoose.model('User', UserSchema);
+export const SessionSummary = mongoose.models.SessionSummary || mongoose.model('SessionSummary', SessionSummarySchema);
+export const AnswerRule = mongoose.models.AnswerRule || mongoose.model('AnswerRule', AnswerRuleSchema);
+export const CanonicalAnswer = mongoose.models.CanonicalAnswer || mongoose.model('CanonicalAnswer', CanonicalAnswerSchema);
+export const KbCandidate = mongoose.models.KbCandidate || mongoose.model('KbCandidate', KbCandidateSchema);
+export const ResponseTrace = mongoose.models.ResponseTrace || mongoose.model('ResponseTrace', ResponseTraceSchema);
+export const AnalyticsEvent = mongoose.models.AnalyticsEvent || mongoose.model('AnalyticsEvent', AnalyticsEventSchema);
+export const QuestionCoverage = mongoose.models.QuestionCoverage || mongoose.model('QuestionCoverage', QuestionCoverageSchema);
+export const DocumentUsage = mongoose.models.DocumentUsage || mongoose.model('DocumentUsage', DocumentUsageSchema);
+export const GapBacklog = mongoose.models.GapBacklog || mongoose.model('GapBacklog', GapBacklogSchema);
+export const AnswerBuilderJob = mongoose.models.AnswerBuilderJob || mongoose.model('AnswerBuilderJob', AnswerBuilderJobSchema);
 
 // Task Kanban Models
 export const TaskListSchema = new Schema({
@@ -419,13 +419,13 @@ export const TaskListSchema = new Schema({
   order: { type: Number, default: 0 },
   isDefault: { type: Boolean, default: false },
 }, { timestamps: true });
-export const TaskList = mongoose.model('TaskList', TaskListSchema);
+export const TaskList = mongoose.models.TaskList || mongoose.model('TaskList', TaskListSchema);
 
 export const TaskLabelSchema = new Schema({
   name: { type: String, required: true },
   color: { type: String, default: '#6B7280' },
 }, { timestamps: true });
-export const TaskLabel = mongoose.model('TaskLabel', TaskLabelSchema);
+export const TaskLabel = mongoose.models.TaskLabel || mongoose.model('TaskLabel', TaskLabelSchema);
 
 export const ChecklistItemSchema = new Schema({
   text: { type: String, required: true },
@@ -445,4 +445,22 @@ export const TaskSchema = new Schema({
   checklist: [ChecklistItemSchema],
   labelIds: [{ type: Schema.Types.ObjectId, ref: 'TaskLabel' }],
 }, { timestamps: true });
-export const Task = mongoose.model('Task', TaskSchema);
+export const Task = mongoose.models.Task || mongoose.model('Task', TaskSchema);
+
+// Metric Configuration for Analytics Dashboard
+export const MetricConfigurationSchema = new Schema({
+  metricId: { type: String, required: true, unique: true, index: true },
+  name: { type: String, required: true },
+  nameEs: { type: String },
+  description: { type: String },
+  category: { type: String, enum: ['temporal', 'client', 'request', 'kanban', 'agent'], required: true },
+  endpoint: { type: String, required: true },
+  chartType: { type: String, enum: ['line', 'bar', 'pie', 'heatmap', 'stat'], required: true },
+  isActive: { type: Boolean, default: true },
+  order: { type: Number, default: 0 },
+  thresholds: {
+    warning: { type: Number },
+    critical: { type: Number },
+  },
+}, { timestamps: true });
+export const MetricConfiguration = mongoose.models.MetricConfiguration || mongoose.model('MetricConfiguration', MetricConfigurationSchema);

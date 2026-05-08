@@ -64,7 +64,7 @@ export function GapFinderPage() {
     setError(null);
     
     try {
-      const res = await apiFetch(`/gap-finder?q=${encodeURIComponent(finalQuery)}`);
+      const res = await apiFetch(`/api/gap-finder?q=${encodeURIComponent(finalQuery)}`);
       
       if (res.ok) {
         const data = await res.json();

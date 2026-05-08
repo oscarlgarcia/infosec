@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { AuthState, LoginCredentials, AuthResponse } from '../types';
 
-export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+export const API_URL = import.meta.env.VITE_API_URL || '';
 
 const STORAGE_KEYS = {
   ACCESS_TOKEN: 'auth_access_token',
@@ -45,7 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = useCallback(async (credentials: LoginCredentials) => {
-    const response = await fetch(`${API_URL}/auth/login`, {
+    const response = await fetch(`/api/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -78,7 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(async () => {
     try {
       if (state.accessToken) {
-        await fetch(`${API_URL}/auth/logout`, {
+        await fetch(`/api/auth/logout`, {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${state.accessToken}`,
@@ -106,7 +106,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!state.refreshToken) return false;
 
     try {
-      const response = await fetch(`${API_URL}/auth/refresh`, {
+      const response = await fetch(`/api/auth/refresh`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -173,7 +173,7 @@ export function useApi() {
         headers.set('Authorization', `Bearer ${accessToken}`);
       }
 
-      let response = await fetch(`${API_URL}${url}`, {
+      let response = await fetch(url, {
         ...options,
         headers,
       });
@@ -183,7 +183,7 @@ export function useApi() {
         if (refreshed) {
           const newToken = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
           headers.set('Authorization', `Bearer ${newToken}`);
-          response = await fetch(`${API_URL}${url}`, {
+          response = await fetch(url, {
             ...options,
             headers,
           });

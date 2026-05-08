@@ -45,8 +45,32 @@ server {
     add_header Expires "0";
     add_header X-Frame-Options "SAMEORIGIN";
     
-    # Proxy API requests to backend - catch all API routes
-    location ~ ^/(api|auth|agents|rules|clients|conversations|knowledge-base|kb|cms|qa|gap-finder|answer-builder|analytics|contradiction-analyzer|knowledge-graph|tasks)/ {
+    # Proxy /api requests directly (already have correct prefix)
+    location ~ ^/api/ {
+        proxy_pass http://infosec-backend:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # API routes (root-level OK - no SPA route conflict, e.g. GET /agents)
+    location ~ ^/(agents|rules|users|clients|conversations|task-lists|documents|requests|auth)(/|$) {
+        rewrite ^/(.*)$ /api/$1 break;
+        proxy_pass http://infosec-backend:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # API routes that need a sub-path (avoids conflict with SPA routes like /analytics, /qa, etc.)
+    location ~ ^/(settings/|analytics/|cms/|qa/|knowledge-base/|knowledge-graph/|kb/|contradiction-analyzer/|analysis/|gap-finder/|answer-builder/|tasks/) {
+        rewrite ^/(.*)$ /api/$1 break;
         proxy_pass http://infosec-backend:3000;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;

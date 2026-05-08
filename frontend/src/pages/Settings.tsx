@@ -183,6 +183,21 @@ export function Settings() {
               : 'Create, edit and configure AI agents for chat'}
           </p>
         </div>
+
+        <div className="settings-section">
+          <h2>📊 {language === 'es' ? 'Gestión de Métricas' : 'Metrics Management'}</h2>
+          <Link 
+            to="/metrics-config" 
+            className="btn-primary settings-link"
+          >
+            ⚙️ {language === 'es' ? 'Configurar Métricas' : 'Configure Metrics'}
+          </Link>
+          <p className="settings-description">
+            {language === 'es' 
+              ? 'Crear, editar y eliminar métricas del dashboard' 
+              : 'Create, edit and delete dashboard metrics'}
+          </p>
+        </div>
       </div>
     </Layout>
   );

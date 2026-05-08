@@ -75,6 +75,25 @@ async function start() {
     }
     
     await connectMongoDB();
+
+    // Seed default metric configurations
+    try {
+      const { MetricConfiguration } = await import('./db/mongo/models');
+      const count = await MetricConfiguration.countDocuments();
+      if (count === 0) {
+        const DEFAULT_METRICS = [
+          { metricId: 'temporal-patterns', name: 'Request Temporal Patterns', nameEs: 'Patrones Temporales de Solicitudes', description: 'Distribution of requests by hour, day, month', category: 'temporal', endpoint: '/analytics/temporal-patterns', chartType: 'line', isActive: true, order: 1 },
+          { metricId: 'client-activity', name: 'Client Activity', nameEs: 'Actividad por Cliente', description: 'Client request volumes and activity trends', category: 'client', endpoint: '/analytics/client-activity', chartType: 'bar', isActive: true, order: 2 },
+          { metricId: 'request-metrics', name: 'Request Metrics', nameEs: 'Métricas de Solicitudes', description: 'Request type distribution and status breakdown', category: 'request', endpoint: '/analytics/request-metrics', chartType: 'stat', isActive: true, order: 3 },
+          { metricId: 'kanban-metrics', name: 'Kanban Metrics', nameEs: 'Métricas Kanban', description: 'Task completion rates and workload balance', category: 'kanban', endpoint: '/analytics/kanban-metrics', chartType: 'stat', isActive: true, order: 4 },
+          { metricId: 'agent-performance', name: 'Agent Performance', nameEs: 'Rendimiento de Agentes', description: 'Agent response times and request handling efficiency', category: 'agent', endpoint: '/analytics/agent-performance', chartType: 'stat', isActive: true, order: 5 },
+        ];
+        await MetricConfiguration.insertMany(DEFAULT_METRICS);
+        console.log('✅ Seeded default metric configurations');
+      }
+    } catch (seedError) {
+      console.warn('⚠️ Could not seed metrics:', (seedError as Error).message);
+    }
     
     // Initialize system agents
     try {

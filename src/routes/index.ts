@@ -92,11 +92,11 @@ import { runChatQuery } from '../services/rag/orchestrator';
 import { detectContradictions } from '../services/rag/contradictions';
 import { ingestDocument, ingestQaFile, ingestRulesFile } from '../services/ingestion/ingestion';
 import { createRule, createKbCandidate, deleteRule, listKbCandidates, listRules, rejectKbCandidate, updateRule, approveKbCandidate, updateKbCandidate } from '../services/governance/governance';
-import { getAnalyticsClientOverview, getAnalyticsCoverageGaps, getAnalyticsFreshness, getAnalyticsOpportunities, getAnalyticsOverview, getAnalyticsQuality, getAnalyticsQuestionClusters, getAnalyticsRecommendations, getAnalyticsTrends, recordResponseFeedback } from '../services/analytics/analytics';
+import { getAnalyticsClientOverview, getAnalyticsCoverageGaps, getAnalyticsFreshness, getAnalyticsOpportunities, getAnalyticsOverview, getAnalyticsQuality, getAnalyticsQuestionClusters, getAnalyticsRecommendations, getAnalyticsTrends, recordResponseFeedback, getAnalyticsTemporalPatterns, getAnalyticsClientActivity, getAnalyticsRequestMetrics, getAnalyticsKanbanMetrics, getAnalyticsAgentPerformance } from '../services/analytics/analytics';
 import { createAnswerBuilderJob, exportAnswerBuilderJobCsv, getAnswerBuilderJob, getAnswerBuilderQueueState } from '../services/answer-builder/jobs';
 import { parseQuestionnaireFile } from '../services/answer-builder/parser';
 import { applyRetentionPolicy, refreshDocumentFreshnessScores } from '../services/ops/maintenance';
-import { ResponseTrace, ClientRequest } from '../db/mongo/models';
+import { ResponseTrace, ClientRequest, MetricConfiguration } from '../db/mongo/models';
 import { agentRoutes } from './agent.routes';
 
 export async function routes(fastify: FastifyInstance) {
@@ -793,6 +793,92 @@ export async function routes(fastify: FastifyInstance) {
         return reply.code(400).send({ error: 'clientId is required' });
       }
       return getAnalyticsClientOverview(request.query.clientId, request.query.windowDays || 30);
+    }
+  );
+
+  // Analytics - Temporal Patterns
+  fastify.get<{ Querystring: { windowDays?: number } }>(
+    '/analytics/temporal-patterns',
+    { preHandler: [verifyToken, requireRole('admin', 'manager', 'sme')] },
+    async (request) => getAnalyticsTemporalPatterns(request.query.windowDays || 30)
+  );
+
+  // Analytics - Client Activity
+  fastify.get<{ Querystring: { windowDays?: number } }>(
+    '/analytics/client-activity',
+    { preHandler: [verifyToken, requireRole('admin', 'manager', 'sme')] },
+    async (request) => getAnalyticsClientActivity(request.query.windowDays || 30)
+  );
+
+  // Analytics - Request Metrics
+  fastify.get<{ Querystring: { windowDays?: number } }>(
+    '/analytics/request-metrics',
+    { preHandler: [verifyToken, requireRole('admin', 'manager', 'sme')] },
+    async (request) => getAnalyticsRequestMetrics(request.query.windowDays || 30)
+  );
+
+  // Analytics - Kanban Metrics
+  fastify.get<{ Querystring: { windowDays?: number } }>(
+    '/analytics/kanban-metrics',
+    { preHandler: [verifyToken, requireRole('admin', 'manager', 'sme')] },
+    async (request) => getAnalyticsKanbanMetrics(request.query.windowDays || 30)
+  );
+
+  // Analytics - Agent Performance
+  fastify.get<{ Querystring: { windowDays?: number } }>(
+    '/analytics/agent-performance',
+    { preHandler: [verifyToken, requireRole('admin', 'manager', 'sme')] },
+    async (request) => getAnalyticsAgentPerformance(request.query.windowDays || 30)
+  );
+
+  // Metrics Configuration CRUD
+  fastify.get(
+    '/metrics-config',
+    { preHandler: [verifyToken, requireRole('admin', 'manager', 'sme')] },
+    async () => MetricConfiguration.find().sort({ order: 1, createdAt: -1 }).lean()
+  );
+
+  fastify.post<{ Body: { metricId: string; name: string; nameEs?: string; description?: string; category: string; endpoint: string; chartType: string; isActive?: boolean; order?: number; thresholds?: { warning?: number; critical?: number } } }>(
+    '/metrics-config',
+    { preHandler: [verifyToken, requireRole('admin', 'manager', 'sme')] },
+    async (request, reply) => {
+      const created = await MetricConfiguration.create(request.body);
+      return reply.code(201).send(created);
+    }
+  );
+
+  fastify.put<{ Params: { id: string }; Body: { name?: string; nameEs?: string; description?: string; category?: string; endpoint?: string; chartType?: string; isActive?: boolean; order?: number; thresholds?: { warning?: number; critical?: number } } }>(
+    '/metrics-config/:id',
+    { preHandler: [verifyToken, requireRole('admin', 'manager', 'sme')] },
+    async (request, reply) => {
+      const updated = await MetricConfiguration.findByIdAndUpdate(
+        request.params.id,
+        { $set: request.body },
+        { new: true }
+      );
+      if (!updated) return reply.code(404).send({ error: 'Metric configuration not found' });
+      return updated;
+    }
+  );
+
+  fastify.delete<{ Params: { id: string } }>(
+    '/metrics-config/:id',
+    { preHandler: [verifyToken, requireRole('admin', 'manager', 'sme')] },
+    async (request, reply) => {
+      await MetricConfiguration.findByIdAndDelete(request.params.id);
+      return reply.code(204).send();
+    }
+  );
+
+  fastify.patch<{ Params: { id: string } }>(
+    '/metrics-config/:id/toggle',
+    { preHandler: [verifyToken, requireRole('admin', 'manager', 'sme')] },
+    async (request, reply) => {
+      const metric = await MetricConfiguration.findById(request.params.id);
+      if (!metric) return reply.code(404).send({ error: 'Metric configuration not found' });
+      metric.isActive = !metric.isActive;
+      await metric.save();
+      return metric;
     }
   );
 
