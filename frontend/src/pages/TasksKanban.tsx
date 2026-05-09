@@ -50,7 +50,7 @@ export function TasksKanban() {
     try {
       const [listsRes, tasksRes] = await Promise.all([
         apiFetch('/task-lists'),
-        apiFetch('/tasks'),
+        apiFetch('/api/tasks'),
       ]);
       const listsData = await listsRes.json();
       const tasksData = await tasksRes.json();

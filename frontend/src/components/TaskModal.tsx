@@ -42,7 +42,7 @@ export function TaskModal({ task, lists, onSave, onClose }: TaskModalProps) {
 
   const loadLabels = async () => {
     try {
-      const res = await apiFetch('/task-labels');
+      const res = await apiFetch('/api/task-labels');
       const data = await res.json();
       setLabels(data);
     } catch (err: any) {
@@ -72,7 +72,7 @@ export function TaskModal({ task, lists, onSave, onClose }: TaskModalProps) {
           body: JSON.stringify(taskData),
         });
       } else {
-        await apiFetch('/tasks', {
+        await apiFetch('/api/tasks', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(taskData),
@@ -111,7 +111,7 @@ export function TaskModal({ task, lists, onSave, onClose }: TaskModalProps) {
   const handleCreateLabel = async () => {
     if (!newLabelName.trim()) return;
     try {
-      await apiFetch('/task-labels', {
+      await apiFetch('/api/task-labels', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newLabelName.trim(), color: newLabelColor }),
