@@ -66,8 +66,8 @@ export function KnowledgeGraphPage() {
         setLoading(true);
         
         const [graphRes, statsRes] = await Promise.all([
-          apiFetch('/knowledge-graph'),
-          apiFetch('/knowledge-graph/stats')
+          apiFetch('/api/knowledge-graph'),
+          apiFetch('/api/knowledge-graph/stats')
         ]);
         
         if (graphRes.ok) {
