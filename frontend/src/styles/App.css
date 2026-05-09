@@ -4860,7 +4860,9 @@ body {
   margin-top: 6px;
 }
 
-.btn-delete {
+.kanban-list-header .btn-delete,
+.task-card-header .btn-delete,
+.task-checklist .btn-delete {
   background: none;
   border: none;
   cursor: pointer;
@@ -4870,7 +4872,9 @@ body {
   padding: 2px 4px;
 }
 
-.btn-delete:hover {
+.kanban-list-header .btn-delete:hover,
+.task-card-header .btn-delete:hover,
+.task-checklist .btn-delete:hover {
   opacity: 1;
 }
 
