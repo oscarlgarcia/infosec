@@ -99,7 +99,7 @@ export function QAPage() {
 
   const fetchEntries = async () => {
     setIsLoading(true);
-    const res = await apiFetch('/qa');
+    const res = await apiFetch('/api/qa');
     if (res.ok) {
       const data = await res.json();
       setEntries(data);
