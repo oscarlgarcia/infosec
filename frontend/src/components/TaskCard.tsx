@@ -13,12 +13,23 @@ export function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
   const totalItems = (task.checklist || []).length;
   
   const dueDate = task.dueDate ? new Date(task.dueDate) : null;
-  const isOverdue = dueDate && dueDate < new Date() && task.status !== 'Completed';
-  
+  const now = new Date();
+  const isOverdue = dueDate && dueDate < now && task.status !== 'Completed';
+  const isDueSoon = dueDate && !isOverdue && task.status !== 'Completed' &&
+    dueDate.getTime() - now.getTime() <= 24 * 60 * 60 * 1000 &&
+    dueDate.getTime() > now.getTime();
+  const isCompleted = task.status === 'Completed';
+
+  const cardClass = [
+    'task-card',
+    isDueSoon ? 'task-card-due-soon' : '',
+    isOverdue ? 'task-card-overdue' : '',
+  ].filter(Boolean).join(' ');
+
   return (
-    <div className="task-card" onClick={onEdit}>
+    <div className={cardClass} onClick={onEdit}>
       <div className="task-card-header">
-        <span className="task-name">{task.name}</span>
+        <span className={`task-name ${isCompleted ? 'task-name-completed' : ''}`}>{task.name}</span>
         <button 
           className="btn-delete" 
           onClick={(e) => { e.stopPropagation(); onDelete(); }}
@@ -43,15 +54,18 @@ export function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
       
       {task.labelIds && (task.labelIds as any[]).length > 0 && (
         <div className="task-labels">
-          {(task.labelIds as any[]).map((label: any) => (
-            <span 
-              key={label._id || label} 
-              className="task-label"
-              style={{ backgroundColor: label.color || '#6B7280' }}
-            >
-              {label.name}
-            </span>
-          ))}
+          {(task.labelIds as any[]).map((label: any) => {
+            if (typeof label === 'string') return null;
+            return (
+              <span
+                key={label._id || label}
+                className="task-label"
+                style={{ backgroundColor: label.color || '#6B7280' }}
+              >
+                {label.name}
+              </span>
+            );
+          })}
         </div>
       )}
       

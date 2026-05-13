@@ -4806,6 +4806,21 @@ body {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
+.task-card-due-soon {
+  background-color: #fef9c3;
+  border-color: #fde68a;
+}
+
+.task-card-overdue {
+  background-color: #fef2f2;
+  border-color: #fecaca;
+}
+
+.task-name-completed {
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
 .task-card-header {
   display: flex;
   justify-content: space-between;
