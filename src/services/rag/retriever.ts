@@ -1,5 +1,5 @@
 import { getChromaClient } from '../chroma/indexer';
-import { createOllamaEmbedding } from '../llm/openai';
+import { createProviderEmbedding } from '../llm/openai';
 
 interface RetrievedPassage {
   content: string;
@@ -16,7 +16,7 @@ export async function retrieveRelevantPassages(args: {
   const { query, limit = 12 } = args;
   
   // Generate embedding for the query
-  const queryEmbedding = await createOllamaEmbedding(query);
+  const queryEmbedding = await createProviderEmbedding(query);
   if (queryEmbedding.length === 0) {
     console.warn('⚠️ No query embedding generated');
     return [];
@@ -24,8 +24,9 @@ export async function retrieveRelevantPassages(args: {
 
   const results: RetrievedPassage[] = [];
   const collections = [
-    { name: 'infosec-kb', sourceType: 'document' as const },  // Documentos subidos (kb_documents)
-    { name: 'qanda', sourceType: 'qa' as const },          // Q&A del documento Q&A.txt
+    { name: 'infosec-kb', sourceType: 'document' as const },
+    { name: 'infosec-cms', sourceType: 'cms' as const },
+    { name: 'qanda', sourceType: 'qa' as const },
   ];
 
   const perCollectionLimit = Math.ceil(limit / 2); // At least 3 from each

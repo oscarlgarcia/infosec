@@ -87,6 +87,7 @@ async function start() {
           { metricId: 'request-metrics', name: 'Request Metrics', nameEs: 'Métricas de Solicitudes', description: 'Request type distribution and status breakdown', category: 'request', endpoint: '/analytics/request-metrics', chartType: 'stat', isActive: true, order: 3 },
           { metricId: 'kanban-metrics', name: 'Kanban Metrics', nameEs: 'Métricas Kanban', description: 'Task completion rates and workload balance', category: 'kanban', endpoint: '/analytics/kanban-metrics', chartType: 'stat', isActive: true, order: 4 },
           { metricId: 'agent-performance', name: 'Agent Performance', nameEs: 'Rendimiento de Agentes', description: 'Agent response times and request handling efficiency', category: 'agent', endpoint: '/analytics/agent-performance', chartType: 'stat', isActive: true, order: 5 },
+          { metricId: 'queue-metrics', name: 'Queue Metrics', nameEs: 'Métricas de Cola', description: 'Orchestrator queue performance and throughput', category: 'agent', endpoint: '/analytics/queue-metrics', chartType: 'stat', isActive: true, order: 6 },
         ];
         await MetricConfiguration.insertMany(DEFAULT_METRICS);
         console.log('✅ Seeded default metric configurations');
@@ -102,6 +103,15 @@ async function start() {
       console.log('✅ System agents initialized');
     } catch (agentError) {
       console.error('❌ Error initializing agents:', agentError);
+    }
+    
+    // Start orchestrator queue polling
+    try {
+      const { startQueuePolling } = await import('./services/orchestrator/queue');
+      startQueuePolling();
+      console.log('✅ Orchestrator queue polling started');
+    } catch (queueError) {
+      console.error('❌ Error starting orchestrator queue:', queueError);
     }
     
     // Test route

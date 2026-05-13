@@ -12,6 +12,8 @@ const envSchema = z.object({
   OPENAI_USE_RESPONSES: z.coerce.boolean().default(false),
   OPENAI_VECTOR_STORE_IDS: z.string().default(''),
   OPENAI_INGEST_TO_VECTOR_STORES: z.coerce.boolean().default(false),
+  OLLAMA_HOST: z.string().default('llm-ollama'),
+  OLLAMA_PORT: z.string().default('11434'),
   MONGODB_URI: z.string().default('mongodb://localhost:27017/infosec'),
   CHROMA_PERSIST_DIRECTORY: z.string().default('./data/chroma'),
   PORT: z.coerce.number().default(3000),

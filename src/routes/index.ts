@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { Setting } from '../db/mongo/models';
 import { generateKnowledgeGraph, getGraphStats } from '../services/knowledgeGraph';
 import { analyzeGap } from '../services/gapFinder';
+import { getLLMSettings, saveLLMSettings } from '../services/llm/llmSettings';
 import {
   uploadDocument, 
   getAllDocuments, 
@@ -93,8 +94,6 @@ import { detectContradictions } from '../services/rag/contradictions';
 import { ingestDocument, ingestQaFile, ingestRulesFile } from '../services/ingestion/ingestion';
 import { createRule, createKbCandidate, deleteRule, listKbCandidates, listRules, rejectKbCandidate, updateRule, approveKbCandidate, updateKbCandidate } from '../services/governance/governance';
 import { getAnalyticsClientOverview, getAnalyticsCoverageGaps, getAnalyticsFreshness, getAnalyticsOpportunities, getAnalyticsOverview, getAnalyticsQuality, getAnalyticsQuestionClusters, getAnalyticsRecommendations, getAnalyticsTrends, recordResponseFeedback, getAnalyticsTemporalPatterns, getAnalyticsClientActivity, getAnalyticsRequestMetrics, getAnalyticsKanbanMetrics, getAnalyticsAgentPerformance } from '../services/analytics/analytics';
-import { createAnswerBuilderJob, exportAnswerBuilderJobCsv, getAnswerBuilderJob, getAnswerBuilderQueueState } from '../services/answer-builder/jobs';
-import { parseQuestionnaireFile } from '../services/answer-builder/parser';
 import { applyRetentionPolicy, refreshDocumentFreshnessScores } from '../services/ops/maintenance';
 import { ResponseTrace, ClientRequest, MetricConfiguration } from '../db/mongo/models';
 import { agentRoutes } from './agent.routes';
@@ -136,6 +135,126 @@ export async function routes(fastify: FastifyInstance) {
     }
   );
 
+  // GET /settings/llm - Get LLM configuration (API key never sent to frontend)
+  fastify.get('/settings/llm',
+    { preHandler: [verifyToken] },
+    async () => {
+      const settings = await getLLMSettings();
+      return {
+        provider: settings.provider,
+        ollamaHost: settings.ollamaHost,
+        ollamaPort: settings.ollamaPort,
+        ollamaModel: settings.ollamaModel,
+        openaiHasKey: !!settings.openaiApiKey,
+        openaiBaseUrl: settings.openaiBaseUrl,
+        openaiModel: settings.openaiModel,
+        activeModel: settings.activeModel,
+      };
+    }
+  );
+
+  // POST /settings/llm - Save LLM configuration
+  fastify.post<{ Body: {
+    provider?: 'ollama' | 'openai';
+    ollamaHost?: string;
+    ollamaPort?: number;
+    ollamaModel?: string;
+    openaiApiKey?: string;
+    openaiBaseUrl?: string;
+    openaiModel?: string;
+  } }>('/settings/llm',
+    { preHandler: [verifyToken, requireRole('admin', 'manager', 'sme')] },
+    async (request, reply) => {
+      try {
+        await saveLLMSettings(request.body);
+        return { success: true };
+      } catch (err) {
+        return reply.code(500).send({ error: 'Failed to save LLM settings' });
+      }
+    }
+  );
+
+  // GET /settings/llm/ollama/models - List available Ollama models
+  fastify.get('/settings/llm/ollama/models',
+    { preHandler: [verifyToken] },
+    async (request, reply) => {
+      try {
+        const settings = await getLLMSettings();
+        const url = `http://${settings.ollamaHost}:${settings.ollamaPort}/api/tags`;
+        const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+        if (!res.ok) return reply.code(502).send({ error: 'Failed to reach Ollama' });
+        const data = await res.json();
+        const models = (data.models || []).map((m: any) => ({
+          name: m.name,
+          size: m.size,
+          modified: m.modified_at,
+        }));
+        return { models };
+      } catch (err) {
+        return reply.code(502).send({ error: 'Cannot connect to Ollama' });
+      }
+    }
+  );
+
+  // GET /settings/llm/openai/models - List available OpenAI models
+  fastify.get('/settings/llm/openai/models',
+    { preHandler: [verifyToken] },
+    async (request, reply) => {
+      try {
+        const settings = await getLLMSettings();
+        if (!settings.openaiApiKey) {
+          return reply.code(400).send({ error: 'OpenAI API key not configured' });
+        }
+        const res = await fetch('https://api.openai.com/v1/models', {
+          headers: { Authorization: `Bearer ${settings.openaiApiKey}` },
+          signal: AbortSignal.timeout(15000),
+        });
+        if (!res.ok) return reply.code(502).send({ error: 'Failed to reach OpenAI' });
+        const data = await res.json();
+        const models = (data.data || [])
+          .filter((m: any) => m.id.startsWith('gpt-') || m.id.startsWith('o'))
+          .map((m: any) => ({ id: m.id, created: m.created, ownedBy: m.owned_by }));
+        return { models };
+      } catch (err) {
+        return reply.code(502).send({ error: 'Cannot connect to OpenAI' });
+      }
+    }
+  );
+
+  // POST /settings/llm/test - Test connection with current settings
+  fastify.post('/settings/llm/test',
+    { preHandler: [verifyToken] },
+    async (request, reply) => {
+      try {
+        const settings = await getLLMSettings();
+        const { chat, createProviderEmbedding } = await import('../services/llm/openai');
+
+        const embedResult = await createProviderEmbedding('test connection');
+        const embedOk = embedResult.length > 0;
+
+        const chatResult = await (chat as any)({
+          messages: [{ role: 'user', content: 'Respond with just: OK' }],
+          model: settings.activeModel,
+          temperature: 0,
+          maxTokens: 10,
+        });
+        const chatOk = chatResult.includes('OK');
+
+        return {
+          success: embedOk && chatOk,
+          embedding: embedOk ? 'ok' : 'failed',
+          chat: chatOk ? 'ok' : 'failed',
+          model: settings.activeModel,
+        };
+      } catch (err: any) {
+        return reply.code(500).send({
+          success: false,
+          error: err.message || 'Connection test failed',
+        });
+      }
+    }
+  );
+
   fastify.get('/uploads/clients/:filename', async (request, reply) => {
     const filename = (request.params as any).filename;
     const filePath = path.join(process.cwd(), 'uploads', 'clients', filename);
@@ -169,6 +288,19 @@ export async function routes(fastify: FastifyInstance) {
     }
     const stream = fs.createReadStream(filePath);
     reply.header('Content-Type', 'application/octet-stream');
+    reply.header('Content-Disposition', `attachment; filename="${filename}"`);
+    return reply.send(stream);
+  });
+
+  const ORCHESTRATOR_UPLOAD_DIR = path.join(process.cwd(), 'uploads', 'orchestrator');
+  fastify.get('/uploads/orchestrator/:filename', async (request, reply) => {
+    const filename = (request.params as any).filename;
+    const filePath = path.join(ORCHESTRATOR_UPLOAD_DIR, filename);
+    if (!fs.existsSync(filePath)) {
+      return reply.code(404).send({ error: 'File not found' });
+    }
+    const stream = fs.createReadStream(filePath);
+    reply.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     reply.header('Content-Disposition', `attachment; filename="${filename}"`);
     return reply.send(stream);
   });
@@ -662,80 +794,7 @@ export async function routes(fastify: FastifyInstance) {
     }
   );
 
-  fastify.post<{ Body: { clientId: string; questions: string[]; domain?: string; subdomain?: string } }>(
-    '/answer-builder/jobs',
-    { preHandler: [verifyToken] },
-    async (request, reply) => {
-      if (!request.body.clientId || !request.body.questions?.length) {
-        return reply.code(400).send({ error: 'clientId and questions[] are required' });
-      }
-      const job = await createAnswerBuilderJob({
-        clientId: request.body.clientId,
-        userId: request.user?.id,
-        questions: request.body.questions,
-        domain: request.body.domain,
-        subdomain: request.body.subdomain,
-      });
-      return reply.code(202).send(job);
-    }
-  );
 
-  fastify.post<{ Querystring: { clientId: string; domain?: string; subdomain?: string } }>(
-    '/answer-builder/upload',
-    { preHandler: [verifyToken] },
-    async (request, reply) => {
-      const upload = await request.file();
-      if (!upload) return reply.code(400).send({ error: 'No file uploaded' });
-      if (!request.query.clientId) return reply.code(400).send({ error: 'clientId is required' });
-
-      const buffer = await upload.toBuffer();
-      const questions = await parseQuestionnaireFile({
-        filename: upload.filename,
-        buffer,
-      });
-
-      if (questions.length === 0) {
-        return reply.code(400).send({ error: 'No valid questions found in file' });
-      }
-
-      const job = await createAnswerBuilderJob({
-        clientId: request.query.clientId,
-        userId: request.user?.id,
-        questions,
-        domain: request.query.domain,
-        subdomain: request.query.subdomain,
-      });
-      return reply.code(202).send({ ...job, parsed_questions: questions.length });
-    }
-  );
-
-  fastify.get<{ Params: { id: string } }>(
-    '/answer-builder/jobs/:id',
-    { preHandler: [verifyToken] },
-    async (request, reply) => {
-      const job = await getAnswerBuilderJob(request.params.id);
-      if (!job) return reply.code(404).send({ error: 'Job not found' });
-      return job;
-    }
-  );
-
-  fastify.get<{ Params: { id: string } }>(
-    '/answer-builder/jobs/:id/export.csv',
-    { preHandler: [verifyToken] },
-    async (request, reply) => {
-      const csv = await exportAnswerBuilderJobCsv(request.params.id);
-      if (!csv) return reply.code(404).send({ error: 'Job output not found' });
-      reply.header('Content-Type', 'text/csv; charset=utf-8');
-      reply.header('Content-Disposition', `attachment; filename="answer-builder-${request.params.id}.csv"`);
-      return reply.send(csv);
-    }
-  );
-
-  fastify.get(
-    '/answer-builder/queue',
-    { preHandler: [verifyToken, requireRole('admin', 'manager', 'sme')] },
-    async () => getAnswerBuilderQueueState()
-  );
 
   fastify.get<{ Querystring: { windowDays?: number } }>(
     '/analytics/overview',
@@ -1496,4 +1555,8 @@ fastify.get<{ Querystring: { q: string; topK?: number } }>(
   // Task Kanban routes
   const { taskRoutes } = await import('./task.routes');
   fastify.register(taskRoutes);
+
+  // Orchestrator routes
+  const { orchestratorRoutes } = await import('./orchestrator.routes');
+  fastify.register(orchestratorRoutes);
 }

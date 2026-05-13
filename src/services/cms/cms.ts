@@ -6,8 +6,8 @@ import {
   RecentAccess,
   FAQ 
 } from '../../db/mongo/models';
-import { createEmbeddings } from '../llm/openai';
-import { addToCollection, queryCollection, deleteFromCollection } from '../../db/vector/chroma';
+import { getChromaClient } from '../chroma/indexer';
+import { createProviderEmbedding, createProviderEmbeddings } from '../llm/openai';
 
 const CHROMA_CMS_COLLECTION = 'infosec-cms';
 
@@ -151,7 +151,13 @@ export async function updateContentPage(id: string, data: Partial<{
 }
 
 export async function deleteContentPage(id: string) {
-  await deleteFromCollection(CHROMA_CMS_COLLECTION, [id]);
+  try {
+    const client = await getChromaClient();
+    const collection = await client.getOrCreateCollection({ name: CHROMA_CMS_COLLECTION });
+    await collection.delete({ ids: [id] });
+  } catch (error) {
+    console.warn('Error deleting from Chroma:', error);
+  }
   return ContentPage.findByIdAndDelete(id);
 }
 
@@ -177,19 +183,22 @@ export async function restoreVersion(pageId: string, versionNumber: number) {
 async function indexContentPage(page: any) {
   try {
     const text = `${page.title} ${page.summary || ''} ${page.content}`.substring(0, 8000);
-    const embedding = await createEmbeddings([text]);
+    const embedding = await createProviderEmbeddings([text]);
+    if (embedding.length === 0 || !embedding[0]?.length) return;
+
+    const client = await getChromaClient();
+    const collection = await client.getOrCreateCollection({ name: CHROMA_CMS_COLLECTION });
     
-    await addToCollection(
-      CHROMA_CMS_COLLECTION,
-      [page._id.toString()],
-      [embedding[0]],
-      [text],
-      [{ 
+    await collection.add({
+      ids: [page._id.toString()],
+      embeddings: [embedding[0]],
+      documents: [text],
+      metadatas: [{ 
         title: page.title, 
         slug: page.slug,
         status: page.status 
       }]
-    );
+    });
   } catch (error) {
     console.error('Error indexing content:', error);
   }
@@ -198,31 +207,32 @@ async function indexContentPage(page: any) {
 // Search content
 export async function searchContent(query: string, limit: number = 10) {
   try {
-    const queryEmbedding = await createEmbeddings([query]);
+    const queryEmbedding = await createProviderEmbeddings([query]);
+    if (queryEmbedding.length === 0 || !queryEmbedding[0]?.length) return [];
+
+    const client = await getChromaClient();
+    const collection = await client.getOrCreateCollection({ name: CHROMA_CMS_COLLECTION });
     
-    const results = await queryCollection(
-      CHROMA_CMS_COLLECTION,
-      queryEmbedding[0],
-      limit,
-      { status: 'published' }
-    );
+    const queryResult = await collection.query({
+      queryEmbeddings: [queryEmbedding[0]],
+      nResults: limit,
+      where: { status: 'published' },
+      include: ['metadatas', 'documents', 'distances']
+    });
 
     const searchResults: any[] = [];
-    if (results.documents && results.ids && results.metadatas) {
-      for (let i = 0; i < results.documents.length; i++) {
-        const doc = results.documents[i];
-        const id = results.ids[i];
-        const metadata = results.metadatas[i];
-        
-        if (doc && id && metadata) {
-          searchResults.push({
-            id: Array.isArray(id) ? id[0] : id,
-            content: Array.isArray(doc) ? doc[0] : doc,
-            title: (metadata as any)?.[0]?.title || '',
-            slug: (metadata as any)?.[0]?.slug || '',
-          });
-        }
-      }
+    const ids = queryResult.ids?.[0] || [];
+    const documents = queryResult.documents?.[0] || [];
+    const metadatas = queryResult.metadatas?.[0] || [];
+
+    for (let i = 0; i < ids.length; i++) {
+      const metadata = (metadatas[i] as Record<string, any>) || {};
+      searchResults.push({
+        id: ids[i],
+        content: documents[i] || '',
+        title: metadata.title || '',
+        slug: metadata.slug || '',
+      });
     }
 
     return searchResults;

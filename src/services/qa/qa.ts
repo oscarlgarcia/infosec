@@ -1,5 +1,5 @@
 import { QAEntry } from '../../db/mongo/models';
-import { createOllamaEmbedding } from '../llm/openai';
+import { createProviderEmbedding } from '../llm/openai';
 import { getChromaClient } from '../chroma/indexer';
 
 type Department = 'Cloud' | 'IT' | 'Development' | 'Compliance' | 'Legal';
@@ -94,7 +94,7 @@ export async function generateQAEmbeddings(): Promise<number> {
   
   for (const entry of entries as any[]) {
     try {
-      const embedding = await createOllamaEmbedding(entry.question);
+      const embedding = await createProviderEmbedding(entry.question);
       await QAEntry.findByIdAndUpdate(entry._id, {
         embedding: embedding.length > 0 ? embedding : null,
         embeddingStatus: embedding.length > 0 ? 'generated' : 'failed'
@@ -117,7 +117,7 @@ export async function semanticSearchQA(query: string, minSimilarity: number = 0)
   if (!query.trim()) return [];
   
   try {
-    const queryEmbedding = await createOllamaEmbedding(query);
+    const queryEmbedding = await createProviderEmbedding(query);
     if (!queryEmbedding.length) {
       console.error('❌ No query embedding generated');
       return [];
@@ -354,7 +354,7 @@ export async function importQAText(content: string, source: string = 'import'): 
     let embedding: number[] | null = null;
     
     try {
-      embedding = await createOllamaEmbedding(qa.question);
+      embedding = await createProviderEmbedding(qa.question);
       embeddingStatus = embedding.length > 0 ? 'generated' : 'failed';
     } catch (err) {
       console.error(`❌ Failed to create embedding for: ${qa.question.substring(0, 30)}...`);
@@ -395,7 +395,7 @@ export async function importQAText(content: string, source: string = 'import'): 
       
       for (const entry of chromaEntries) {
         try {
-          const emb = await createOllamaEmbedding(entry.text);
+          const emb = await createProviderEmbedding(entry.text);
           if (emb.length > 0) {
             await collection.add({
               ids: [entry.id],
@@ -480,7 +480,7 @@ export async function reindexQAEntriesToChroma(): Promise<{ success: number; fai
         continue;
       }
       
-      const embedding = await createOllamaEmbedding(text);
+      const embedding = await createProviderEmbedding(text);
       if (embedding.length === 0) {
         failed++;
         continue;

@@ -1,19 +1,5 @@
-import { ChromaClient } from 'chromadb';
-import { createOllamaEmbedding } from './llm/openai';
-
-const CHROMA_HOST = process.env.CHROMA_HOST || 'chroma';
-const CHROMA_PORT = process.env.CHROMA_PORT || '8000';
-
-let chromaClient: ChromaClient | null = null;
-
-async function getChromaClient(): Promise<ChromaClient> {
-  if (!chromaClient) {
-    chromaClient = new ChromaClient({
-      path: `http://${CHROMA_HOST}:${CHROMA_PORT}`,
-    });
-  }
-  return chromaClient;
-}
+import { getChromaClient } from './chroma/indexer';
+import { createProviderEmbedding } from './llm/openai';
 
 interface GapAnalysis {
   query: string;
@@ -70,12 +56,12 @@ function generateAction(item: GapItem): { action: string; actionType: 'add-conte
 export async function analyzeGap(query: string, topK: number = 10000): Promise<GapAnalysis> {
   const client = await getChromaClient();
   
-  const queryEmbedding = await createOllamaEmbedding(query);
+  const queryEmbedding = await createProviderEmbedding(query);
   if (queryEmbedding.length === 0) {
     throw new Error('Failed to generate query embedding');
   }
   
-  const collections = ['qanda', 'cms', 'knowledge', 'faq'];
+  const collections = ['qanda', 'infosec-cms', 'infosec-kb', 'faq'];
   const gaps: GapItem[] = [];
   const strengths: GapItem[] = [];
   const categoryCount: Record<string, number> = {};

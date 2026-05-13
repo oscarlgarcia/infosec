@@ -1,5 +1,5 @@
 import { AnswerRule, CanonicalAnswer, KbCandidate, QAEntry } from '../../db/mongo/models';
-import { createOllamaEmbedding } from '../llm/openai';
+import { createProviderEmbedding } from '../llm/openai';
 import { getChromaClient } from '../chroma/indexer';
 
 export async function createRule(input: { name: string; content: string; domain?: string; enabled?: boolean; appliesTo?: string[] }) {
@@ -62,7 +62,7 @@ export async function approveKbCandidate(id: string, reviewer: string, note?: st
 
   try {
     const text = `${candidate.question} ${candidate.suggestedAnswer}`.trim();
-    const embedding = await createOllamaEmbedding(text);
+    const embedding = await createProviderEmbedding(text);
     if (embedding.length > 0) {
       await QAEntry.findByIdAndUpdate(qaEntry._id, {
         embedding,

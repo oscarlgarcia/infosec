@@ -5,8 +5,8 @@ import mammoth from 'mammoth';
 import xlsx from 'xlsx';
 import * as cheerio from 'cheerio';
 import { DocumentModel } from '../../db/mongo/models';
-import { addToCollection, queryCollection } from '../../db/vector/chroma';
-import { createEmbeddings, createOllamaEmbeddings, createOllamaEmbedding } from '../llm/openai';
+import { getChromaClient } from '../chroma/indexer';
+import { createProviderEmbedding, createProviderEmbeddings } from '../llm/openai';
 import type { Department, Document as DocType, SearchResult } from '../../types';
 
 const CHROMA_COLLECTION = 'infosec-kb';
@@ -82,7 +82,7 @@ export async function uploadDocument(
   
   try {
     console.log('🔄 Creating embedding for document:', originalName, 'Content length:', content.length);
-    embedding = await createOllamaEmbedding(content);
+    embedding = await createProviderEmbedding(content);
     if (embedding.length > 0) {
       embeddingStatus = 'generated';
       console.log('✅ Embedding created, vector size:', embedding.length);
@@ -126,34 +126,34 @@ export async function searchKnowledgeBase(
   department?: Department,
   limit: number = 5
 ): Promise<SearchResult[]> {
-  const queryEmbedding = await createEmbeddings([query]);
-  
-  const results = await queryCollection(
-    CHROMA_COLLECTION,
-    queryEmbedding[0],
-    limit,
-    department ? { department } : undefined
-  );
+  const queryEmbedding = await createProviderEmbedding(query);
+  if (queryEmbedding.length === 0) return [];
+
+  const client = await getChromaClient();
+  const collection = await client.getOrCreateCollection({ name: CHROMA_COLLECTION });
+
+  const queryResult = await collection.query({
+    queryEmbeddings: [queryEmbedding],
+    nResults: limit,
+    where: department ? { department } : undefined,
+    include: ['metadatas', 'documents', 'distances']
+  });
 
   const searchResults: SearchResult[] = [];
-  
-  if (results.documents && results.ids && results.metadatas && results.distances) {
-    for (let i = 0; i < results.documents.length; i++) {
-      const doc = results.documents[i];
-      const id = results.ids[i];
-      const metadata = results.metadatas[i];
-      const distance = results.distances[i];
-      
-      if (doc && id && metadata) {
-        searchResults.push({
-          documentId: Array.isArray(id) ? id[0] : id,
-          content: Array.isArray(doc) ? doc[0] : doc,
-          department: (metadata as any)[0]?.department as Department || 'Cloud',
-          score: 1 - ((Array.isArray(distance) ? distance[0] : distance) || 0),
-          source: (metadata as any)[0]?.originalName as string || '',
-        });
-      }
-    }
+  const ids = queryResult.ids?.[0] || [];
+  const documents = queryResult.documents?.[0] || [];
+  const metadatas = queryResult.metadatas?.[0] || [];
+  const distances = queryResult.distances?.[0] || [];
+
+  for (let i = 0; i < ids.length; i++) {
+    const metadata = (metadatas[i] as Record<string, any>) || {};
+    searchResults.push({
+      documentId: ids[i],
+      content: documents[i] || '',
+      department: metadata.department || 'Cloud',
+      score: 1 - (distances[i] ?? 1),
+      source: metadata.originalName || '',
+    });
   }
 
   return searchResults;
@@ -214,7 +214,7 @@ export async function semanticSearchDocuments(
   let queryEmbedding: number[] = [];
   
   try {
-    queryEmbedding = await createOllamaEmbedding(query);
+    queryEmbedding = await createProviderEmbedding(query);
   } catch (err) {
     console.error('❌ Failed to create query embedding:', err);
     return [];
@@ -286,6 +286,9 @@ export async function semanticSearchDocuments(
     
     console.log(`🔄 Re-indexing ${docs.length} documents to ChromaDB...`);
     
+    const client = await getChromaClient();
+    const collection = await client.getOrCreateCollection({ name: CHROMA_COLLECTION });
+    
     let success = 0;
     let failed = 0;
     const batchSize = 10;
@@ -295,7 +298,7 @@ export async function semanticSearchDocuments(
       const contents = batch.map(doc => doc.content || '');
       
       try {
-        const embeddings = await createEmbeddings(contents);
+        const embeddings = await createProviderEmbeddings(contents);
         
         const validItems = batch.map((doc, idx) => ({
           doc,
@@ -308,19 +311,17 @@ export async function semanticSearchDocuments(
           continue;
         }
         
-        await addToCollection(
-          CHROMA_COLLECTION,
-          validItems.map(item => item.doc._id.toString()),
-          validItems.map(item => item.embedding),
-          validItems.map(item => item.content),
-          validItems.map(item => ({
+        await collection.add({
+          ids: validItems.map(item => item.doc._id.toString()),
+          embeddings: validItems.map(item => item.embedding),
+          documents: validItems.map(item => item.content),
+          metadatas: validItems.map(item => ({
             originalName: item.doc.originalName || '',
             department: item.doc.department || '',
             source: 'document'
           }))
-        );
+        });
         
-        // Update lastIndexedAt for all successfully indexed docs
         const ids = validItems.map(item => item.doc._id);
         await DocumentModel.updateMany(
           { _id: { $in: ids } },

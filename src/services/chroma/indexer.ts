@@ -1,5 +1,5 @@
 import { ChromaClient } from 'chromadb';
-import { createOllamaEmbedding } from '../llm/openai';
+import { createProviderEmbedding } from '../llm/openai';
 
 const CHROMA_HOST = process.env.CHROMA_HOST || 'chroma';
 const CHROMA_PORT = process.env.CHROMA_PORT || '8000';
@@ -39,7 +39,7 @@ export async function indexQAEntries(entries: MongoDoc[]): Promise<{ success: nu
       const text = `${entry.question || ''} ${entry.answer || ''}`.trim();
       if (text.length < 5) continue;
       
-      const embedding = await createOllamaEmbedding(text);
+      const embedding = await createProviderEmbedding(text);
       if (embedding.length === 0) {
         failed++;
         continue;
@@ -69,7 +69,7 @@ export async function indexQAEntries(entries: MongoDoc[]): Promise<{ success: nu
 
 export async function indexContentPages(pages: MongoDoc[]): Promise<{ success: number; failed: number }> {
   const client = await getChromaClient();
-  const collection = await client.getOrCreateCollection({ name: 'cms' });
+  const collection = await client.getOrCreateCollection({ name: 'infosec-cms' });
   
   let success = 0;
   let failed = 0;
@@ -79,7 +79,7 @@ export async function indexContentPages(pages: MongoDoc[]): Promise<{ success: n
       const text = `${page.title || ''} ${page.summary || ''} ${page.content || ''}`.trim();
       if (text.length < 5) continue;
       
-      const embedding = await createOllamaEmbedding(text);
+      const embedding = await createProviderEmbedding(text);
       if (embedding.length === 0) {
         failed++;
         continue;
@@ -119,7 +119,7 @@ export async function indexDocuments(docs: MongoDoc[]): Promise<{ success: numbe
       const text = `${doc.title || ''} ${doc.content || ''}`.trim();
       if (text.length < 5) continue;
       
-      const embedding = await createOllamaEmbedding(text);
+      const embedding = await createProviderEmbedding(text);
       if (embedding.length === 0) {
         failed++;
         continue;
@@ -159,7 +159,7 @@ export async function indexFAQs(faqs: MongoDoc[]): Promise<{ success: number; fa
       const text = `${faq.question || ''} ${faq.answer || ''}`.trim();
       if (text.length < 5) continue;
       
-      const embedding = await createOllamaEmbedding(text);
+      const embedding = await createProviderEmbedding(text);
       if (embedding.length === 0) {
         failed++;
         continue;
@@ -188,7 +188,7 @@ export async function indexFAQs(faqs: MongoDoc[]): Promise<{ success: number; fa
 
 export async function clearAllCollections(): Promise<void> {
   const client = await getChromaClient();
-  const collections = ['qanda', 'cms', 'knowledge', 'faq', 'infosec-kb'];  // Keep 'knowledge' in case old data exists
+  const collections = ['qanda', 'infosec-cms', 'knowledge', 'faq', 'infosec-kb'];  // Keep 'knowledge' in case old data exists
   
   for (const name of collections) {
     try {
@@ -201,7 +201,7 @@ export async function clearAllCollections(): Promise<void> {
 
 export async function getCollectionStats(): Promise<Record<string, number>> {
   const client = await getChromaClient();
-  const collections = ['qanda', 'cms', 'knowledge', 'faq'];
+  const collections = ['qanda', 'infosec-cms', 'infosec-kb', 'faq'];
   const stats: Record<string, number> = {};
   
   for (const name of collections) {

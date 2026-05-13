@@ -18,7 +18,8 @@ export type RequestType =
   | 'BC/DR Test Result Request'
   | 'Cloud Customer PT Request'
   | 'Certification Request'
-  | 'Other Support';
+  | 'Other Support'
+  | 'Answer Builder';
 
 export interface Attachment {
   id: string;
@@ -414,6 +415,18 @@ export interface AnalyticsRequestMetrics {
   overdue_count: number;
   avg_resolution_days: number;
   workload_by_owner: Array<{ owner: string; count: number }>;
+}
+
+// Queue Metrics
+export interface AnalyticsQueueMetrics {
+  windowDays: number;
+  total_jobs: number;
+  throughput_daily: number;
+  avg_wait_time_ms: number;
+  avg_processing_time_ms: number;
+  failure_rate: number;
+  by_status: Array<{ status: string; count: number }>;
+  daily_breakdown: Array<{ date: string; completed: number; failed: number; total: number }>;
 }
 
 // Kanban Metrics

@@ -5,6 +5,29 @@ import { useApi } from '../contexts/AuthContext';
 import '../styles/App.css';
 import { Link } from 'react-router-dom';
 
+interface LLMConfig {
+  provider: 'ollama' | 'openai';
+  ollamaHost: string;
+  ollamaPort: number;
+  ollamaModel: string;
+  openaiHasKey: boolean;
+  openaiBaseUrl: string;
+  openaiModel: string;
+  activeModel: string;
+}
+
+interface OllamaModel {
+  name: string;
+  size: number;
+  modified: string;
+}
+
+interface OpenAIModel {
+  id: string;
+  created: number;
+  ownedBy: string;
+}
+
 export function Settings() {
   const { language, setLanguage, t } = useLanguage();
   const apiFetch = useApi();
@@ -14,6 +37,20 @@ export function Settings() {
   const [reindexDocsMsg, setReindexDocsMsg] = useState('');
   const [debugLogging, setDebugLogging] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  // LLM Config state
+  const [llmConfig, setLlmConfig] = useState<LLMConfig | null>(null);
+  const [llmConfigLoading, setLlmConfigLoading] = useState(true);
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [editingApiKey, setEditingApiKey] = useState('');
+  const [browsingModels, setBrowsingModels] = useState(false);
+  const [modelsList, setModelsList] = useState<(OllamaModel | OpenAIModel)[]>([]);
+  const [modelsLoading, setModelsLoading] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; embedding?: string; chat?: string; model?: string; error?: string } | null>(null);
+  const [testLoading, setTestLoading] = useState(false);
+  const [savingConfig, setSavingConfig] = useState(false);
+  const [configMsg, setConfigMsg] = useState('');
+  const [configStatus, setConfigStatus] = useState<'env' | 'saved'>('env');
 
   const toggleLanguage = () => {
     setLanguage(language === 'es' ? 'en' : 'es');
@@ -32,7 +69,100 @@ export function Settings() {
       }
     };
     fetchDebugSetting();
+    loadLLMConfig();
   }, []);
+
+  const loadLLMConfig = async () => {
+    try {
+      const res = await apiFetch('/settings/llm');
+      const data = await res.json();
+      setLlmConfig(data);
+      setConfigStatus(data.provider ? 'saved' : 'env');
+    } catch (e) {
+      console.error('Failed to fetch LLM config:', e);
+    } finally {
+      setLlmConfigLoading(false);
+    }
+  };
+
+  const handleProviderChange = (provider: 'ollama' | 'openai') => {
+    if (!llmConfig) return;
+    setLlmConfig({ ...llmConfig, provider });
+    setTestResult(null);
+  };
+
+  const handleSaveConfig = async () => {
+    if (!llmConfig) return;
+    setSavingConfig(true);
+    setConfigMsg('');
+    try {
+      const body: any = {
+        provider: llmConfig.provider,
+        ollamaHost: llmConfig.ollamaHost,
+        ollamaPort: llmConfig.ollamaPort,
+        ollamaModel: llmConfig.ollamaModel,
+        openaiBaseUrl: llmConfig.openaiBaseUrl,
+        openaiModel: llmConfig.openaiModel,
+      };
+      if (editingApiKey) {
+        body.openaiApiKey = editingApiKey;
+      }
+      const res = await apiFetch('/settings/llm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error('Save failed');
+      setConfigMsg(language === 'es' ? 'Configuración guardada' : 'Configuration saved');
+      setConfigStatus('saved');
+      setEditingApiKey('');
+    } catch (e) {
+      setConfigMsg(language === 'es' ? 'Error al guardar' : 'Save failed');
+    } finally {
+      setSavingConfig(false);
+    }
+  };
+
+  const handleTestConnection = async () => {
+    setTestLoading(true);
+    setTestResult(null);
+    try {
+      const res = await apiFetch('/settings/llm/test', { method: 'POST' });
+      const data = await res.json();
+      setTestResult(data);
+    } catch (e) {
+      setTestResult({ success: false, error: 'Connection test failed' });
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
+  const handleBrowseModels = async () => {
+    if (!llmConfig) return;
+    setBrowsingModels(true);
+    setModelsLoading(true);
+    setModelsList([]);
+    try {
+      const endpoint = llmConfig.provider === 'openai' ? '/settings/llm/openai/models' : '/settings/llm/ollama/models';
+      const res = await apiFetch(endpoint);
+      const data = await res.json();
+      setModelsList(data.models || []);
+    } catch (e) {
+      console.error('Failed to fetch models:', e);
+    } finally {
+      setModelsLoading(false);
+    }
+  };
+
+  const handleSelectModel = (modelName: string) => {
+    if (!llmConfig) return;
+    if (llmConfig.provider === 'openai') {
+      setLlmConfig({ ...llmConfig, openaiModel: modelName });
+    } else {
+      setLlmConfig({ ...llmConfig, ollamaModel: modelName });
+    }
+    setBrowsingModels(false);
+  };
 
   const toggleDebugLogging = async () => {
     const newValue = !debugLogging;
@@ -107,6 +237,206 @@ export function Settings() {
               : 'Change the application language'}
           </p>
         </div>
+
+        {/* LLM Configuration */}
+        <div className="settings-section">
+          <h2 className="settings-section-title">
+            {language === 'es' ? 'Configuración LLM' : 'LLM Configuration'}
+          </h2>
+          {configStatus === 'env' && !llmConfigLoading && (
+            <p className="env-notice">
+              {language === 'es'
+                ? 'Usando variables de entorno. Guarda la configuración para personalizar.'
+                : 'Using environment variables. Save configuration to customize.'}
+            </p>
+          )}
+
+          {llmConfigLoading ? (
+            <p className="loading-text">{language === 'es' ? 'Cargando...' : 'Loading...'}</p>
+          ) : llmConfig && (
+            <div className="llm-config-form">
+              <div className="form-group">
+                <label>{language === 'es' ? 'Proveedor' : 'Provider'}</label>
+                <select
+                  value={llmConfig.provider}
+                  onChange={(e) => handleProviderChange(e.target.value as 'ollama' | 'openai')}
+                  className="form-select"
+                >
+                  <option value="ollama">Ollama</option>
+                  <option value="openai">OpenAI</option>
+                </select>
+              </div>
+
+              {llmConfig.provider === 'ollama' && (
+                <>
+                  <div className="form-group">
+                    <label>{language === 'es' ? 'Host' : 'Host'}</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={llmConfig.ollamaHost}
+                      onChange={(e) => setLlmConfig({ ...llmConfig, ollamaHost: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>{language === 'es' ? 'Puerto' : 'Port'}</label>
+                    <input
+                      type="number"
+                      className="form-input"
+                      value={llmConfig.ollamaPort}
+                      onChange={(e) => setLlmConfig({ ...llmConfig, ollamaPort: Number(e.target.value) })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>{language === 'es' ? 'Modelo' : 'Model'}</label>
+                    <div className="model-select-row">
+                      <input
+                        type="text"
+                        className="form-input model-input"
+                        value={llmConfig.ollamaModel}
+                        onChange={(e) => setLlmConfig({ ...llmConfig, ollamaModel: e.target.value })}
+                      />
+                      <button className="btn-secondary" onClick={handleBrowseModels}>
+                        {language === 'es' ? 'Explorar' : 'Browse'}
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {llmConfig.provider === 'openai' && (
+                <>
+                  <div className="form-group">
+                    <label>
+                      API Key
+                      <span className="api-key-indicator" title={llmConfig.openaiHasKey ? (language === 'es' ? 'Clave configurada' : 'Key configured') : (language === 'es' ? 'Sin clave' : 'No key')}>
+                        {llmConfig.openaiHasKey ? ' ✅' : ' ❌'}
+                      </span>
+                    </label>
+                    <div className="api-key-row">
+                      <input
+                        type={showApiKey ? 'text' : 'password'}
+                        className="form-input"
+                        value={editingApiKey}
+                        onChange={(e) => setEditingApiKey(e.target.value)}
+                        placeholder={llmConfig.openaiHasKey ? '••••••••' : (language === 'es' ? 'Ingresa tu API Key' : 'Enter your API Key')}
+                      />
+                      <button
+                        className="btn-icon"
+                        onClick={() => setShowApiKey(!showApiKey)}
+                        title={showApiKey ? (language === 'es' ? 'Ocultar' : 'Hide') : (language === 'es' ? 'Mostrar' : 'Show')}
+                      >
+                        {showApiKey ? '🙈' : '👁️'}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="form-group">
+                    <label>Base URL</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={llmConfig.openaiBaseUrl}
+                      onChange={(e) => setLlmConfig({ ...llmConfig, openaiBaseUrl: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>{language === 'es' ? 'Modelo' : 'Model'}</label>
+                    <div className="model-select-row">
+                      <input
+                        type="text"
+                        className="form-input model-input"
+                        value={llmConfig.openaiModel}
+                        onChange={(e) => setLlmConfig({ ...llmConfig, openaiModel: e.target.value })}
+                      />
+                      <button className="btn-secondary" onClick={handleBrowseModels}>
+                        {language === 'es' ? 'Explorar' : 'Browse'}
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              <div className="llm-actions">
+                <button
+                  className="btn-secondary"
+                  onClick={handleTestConnection}
+                  disabled={testLoading}
+                >
+                  {testLoading
+                    ? (language === 'es' ? 'Probando...' : 'Testing...')
+                    : (language === 'es' ? 'Probar Conexión' : 'Test Connection')}
+                </button>
+                <button
+                  className="btn-primary"
+                  onClick={handleSaveConfig}
+                  disabled={savingConfig}
+                >
+                  {savingConfig
+                    ? (language === 'es' ? 'Guardando...' : 'Saving...')
+                    : (language === 'es' ? 'Guardar Configuración' : 'Save Configuration')}
+                </button>
+              </div>
+
+              {testResult && (
+                <div className={`test-result ${testResult.success ? 'success' : 'error'}`}>
+                  {testResult.success ? (
+                    <p>
+                      {language === 'es' ? 'Conexión exitosa' : 'Connection successful'} —{' '}
+                      {language === 'es' ? 'Modelo' : 'Model'}: {testResult.model}
+                      {testResult.embedding && ` | Embedding: ${testResult.embedding}`}
+                      {testResult.chat && ` | Chat: ${testResult.chat}`}
+                    </p>
+                  ) : (
+                    <p>{language === 'es' ? 'Error' : 'Error'}: {testResult.error || (language === 'es' ? 'Falló la conexión' : 'Connection failed')}</p>
+                  )}
+                </div>
+              )}
+
+              {configMsg && (
+                <p className="config-msg">{configMsg}</p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Model Browser Modal */}
+        {browsingModels && (
+          <div className="modal-overlay" onClick={() => setBrowsingModels(false)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h3>
+                  {language === 'es' ? 'Modelos disponibles' : 'Available Models'}
+                  {llmConfig?.provider === 'openai' ? ' (OpenAI)' : ' (Ollama)'}
+                </h3>
+                <button className="modal-close" onClick={() => setBrowsingModels(false)}>✕</button>
+              </div>
+              <div className="modal-body">
+                {modelsLoading ? (
+                  <p className="loading-text">{language === 'es' ? 'Cargando modelos...' : 'Loading models...'}</p>
+                ) : modelsList.length === 0 ? (
+                  <p className="empty-text">{language === 'es' ? 'No se encontraron modelos' : 'No models found'}</p>
+                ) : (
+                  <ul className="model-list">
+                    {llmConfig?.provider === 'openai'
+                      ? (modelsList as OpenAIModel[]).map((m) => (
+                          <li key={m.id} className="model-item" onClick={() => handleSelectModel(m.id)}>
+                            <span className="model-name">{m.id}</span>
+                            <span className="model-meta">{m.ownedBy}</span>
+                          </li>
+                        ))
+                      : (modelsList as OllamaModel[]).map((m) => (
+                          <li key={m.name} className="model-item" onClick={() => handleSelectModel(m.name)}>
+                            <span className="model-name">{m.name}</span>
+                            <span className="model-meta">{formatSize(m.size)}</span>
+                          </li>
+                        ))
+                    }
+                  </ul>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="settings-section">
           <h2 className="settings-section-title">{language === 'es' ? 'Base de Conocimientos' : 'Knowledge Base'}</h2>
@@ -201,4 +531,12 @@ export function Settings() {
       </div>
     </Layout>
   );
+}
+
+function formatSize(bytes: number): string {
+  if (!bytes) return '';
+  const gb = bytes / (1024 * 1024 * 1024);
+  if (gb >= 1) return `${gb.toFixed(1)} GB`;
+  const mb = bytes / (1024 * 1024);
+  return `${mb.toFixed(0)} MB`;
 }

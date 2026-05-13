@@ -46,7 +46,8 @@ export const RequestType = [
   'BC/DR Test Result Request',
   'Cloud Customer PT Request',
   'Certification Request',
-  'Other Support'
+  'Other Support',
+  'Answer Builder'
 ] as const;
 
 export const ClientSchema = new Schema({
@@ -383,7 +384,63 @@ export const AnswerBuilderJobSchema = new Schema({
   errorMessage: { type: String },
 }, { timestamps: true });
 
+// Orchestrator Schemas
+export const PipelineStepSchema = new Schema({
+  stage: { type: String, enum: ['reader', 'processor', 'writer'], required: true },
+  status: { type: String, enum: ['pending', 'running', 'completed', 'failed'], default: 'pending' },
+  startedAt: { type: Date },
+  completedAt: { type: Date },
+  error: { type: String },
+  progress: { type: Number, default: 0 },
+});
+
+export const OrchestratorJobSchema = new Schema({
+  name: { type: String, required: true },
+  pipeline: { type: String, enum: ['answer-builder'], required: true },
+  status: { type: String, enum: ['pending', 'queued', 'running', 'paused', 'completed', 'failed', 'cancelled'], default: 'pending' },
+  clientId: { type: Schema.Types.ObjectId, ref: 'Client', required: true, index: true },
+  requestId: { type: Schema.Types.ObjectId, ref: 'ClientRequest', index: true },
+  conversationId: { type: Schema.Types.ObjectId, ref: 'Conversation' },
+  agent: { type: String, default: 'InfoSec' },
+  inputFile: { type: String },
+  inputQuestions: [{ type: String }],
+  outputRows: [{
+    question: { type: String },
+    answer: { type: String },
+    domain: { type: String },
+    subdomain: { type: String },
+    confidence: { type: Number },
+    requiresLegalReview: { type: Boolean },
+    contradictionFlag: { type: Boolean },
+    evidenceCount: { type: Number },
+    notes: { type: String },
+    timingMs: { type: Number },
+  }],
+  totalQuestions: { type: Number, default: 0 },
+  completedQuestions: { type: Number, default: 0 },
+  progress: { type: Number, default: 0 },
+  steps: [PipelineStepSchema],
+  errorMessage: { type: String },
+  outputFile: { type: String },
+  avgTimingMs: { type: Number, default: 0 },
+  startedAt: { type: Date },
+  completedAt: { type: Date },
+}, { timestamps: true });
+
+export const QueueItemSchema = new Schema({
+  jobId: { type: Schema.Types.ObjectId, ref: 'OrchestratorJob', required: true, unique: true },
+  pipeline: { type: String, enum: ['answer-builder'], required: true },
+  status: { type: String, enum: ['pending', 'queued', 'running', 'paused', 'completed', 'failed', 'cancelled'], default: 'queued' },
+  priority: { type: Number, default: 0 },
+  enqueuedAt: { type: Date, default: Date.now },
+  startedAt: { type: Date },
+}, { timestamps: true });
+
 // Export models
+export const OrchestratorJob = mongoose.models.OrchestratorJob || mongoose.model('OrchestratorJob', OrchestratorJobSchema);
+export const QueueItem = mongoose.models.QueueItem || mongoose.model('QueueItem', QueueItemSchema);
+
+
 export const Client = mongoose.models.Client || mongoose.model('Client', ClientSchema);
 export const ClientRequest = mongoose.models.ClientRequest || mongoose.model('ClientRequest', ClientRequestSchema);
 export const Conversation = mongoose.models.Conversation || mongoose.model('Conversation', ConversationSchema);
@@ -411,7 +468,7 @@ export const AnalyticsEvent = mongoose.models.AnalyticsEvent || mongoose.model('
 export const QuestionCoverage = mongoose.models.QuestionCoverage || mongoose.model('QuestionCoverage', QuestionCoverageSchema);
 export const DocumentUsage = mongoose.models.DocumentUsage || mongoose.model('DocumentUsage', DocumentUsageSchema);
 export const GapBacklog = mongoose.models.GapBacklog || mongoose.model('GapBacklog', GapBacklogSchema);
-export const AnswerBuilderJob = mongoose.models.AnswerBuilderJob || mongoose.model('AnswerBuilderJob', AnswerBuilderJobSchema);
+
 
 // Task Kanban Models
 export const TaskListSchema = new Schema({

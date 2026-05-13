@@ -71,7 +71,7 @@ server {
     }
 
     # API routes that need a sub-path (avoids conflict with SPA routes like /analytics, /qa, etc.)
-    location ~ ^/(settings/|analytics/|cms/|qa/|knowledge-base/|knowledge-graph/|kb/|contradiction-analyzer/|analysis/|gap-finder/|answer-builder/|tasks/) {
+    location ~ ^/(settings/|analytics/|cms/|qa/|knowledge-base/|knowledge-graph/|kb/|contradiction-analyzer/|analysis/|gap-finder/|tasks/|orchestrator/) {
         rewrite ^/(.*)$ /api/$1 break;
         proxy_pass http://infosec-backend:3000;
         proxy_http_version 1.1;

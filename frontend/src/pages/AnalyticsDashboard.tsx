@@ -11,6 +11,7 @@ import type {
   AnalyticsOverview,
   AnalyticsQuestionClusters,
   AnalyticsQuality,
+  AnalyticsQueueMetrics,
   AnalyticsRecommendations,
   AnalyticsTrends,
   AnalyticsTemporalPatterns,
@@ -42,6 +43,7 @@ export function AnalyticsDashboardPage() {
   const [requestMetrics, setRequestMetrics] = useState<AnalyticsRequestMetrics | null>(null);
   const [kanbanMetrics, setKanbanMetrics] = useState<AnalyticsKanbanMetrics | null>(null);
   const [agentPerformance, setAgentPerformance] = useState<AnalyticsAgentPerformance | null>(null);
+  const [queueMetrics, setQueueMetrics] = useState<AnalyticsQueueMetrics | null>(null);
   const [clients, setClients] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedClientId, setSelectedClientId] = useState('');
   const [clientOverview, setClientOverview] = useState<AnalyticsClientOverview | null>(null);
@@ -94,7 +96,7 @@ export function AnalyticsDashboardPage() {
     setLoading(true);
     setError(null);
     try {
-      const [overviewRes, coverageRes, qualityRes, freshnessRes, recommendationRes, trendsRes, clustersRes, opportunitiesRes, tempPatternsRes, clientActRes, reqMetricsRes, kanbanRes, agentPerfRes] = await Promise.all([
+      const [overviewRes, coverageRes, qualityRes, freshnessRes, recommendationRes, trendsRes, clustersRes, opportunitiesRes, tempPatternsRes, clientActRes, reqMetricsRes, kanbanRes, agentPerfRes, queueMetricsRes] = await Promise.all([
         apiFetch(`/api/analytics/overview?windowDays=${windowDays}`),
         apiFetch(`/api/analytics/coverage-gaps?windowDays=${windowDays}`),
         apiFetch(`/api/analytics/quality?windowDays=${windowDays}`),
@@ -108,9 +110,10 @@ export function AnalyticsDashboardPage() {
         apiFetch(`/api/analytics/request-metrics?windowDays=${windowDays}`),
         apiFetch(`/api/analytics/kanban-metrics?windowDays=${windowDays}`),
         apiFetch(`/api/analytics/agent-performance?windowDays=${windowDays}`),
+        apiFetch(`/api/analytics/queue-metrics?windowDays=${windowDays}`),
       ]);
 
-      if (!overviewRes.ok || !coverageRes.ok || !qualityRes.ok || !freshnessRes.ok || !recommendationRes.ok || !trendsRes.ok || !clustersRes.ok || !opportunitiesRes.ok || !tempPatternsRes.ok || !clientActRes.ok || !reqMetricsRes.ok || !kanbanRes.ok || !agentPerfRes.ok) {
+      if (!overviewRes.ok || !coverageRes.ok || !qualityRes.ok || !freshnessRes.ok || !recommendationRes.ok || !trendsRes.ok || !clustersRes.ok || !opportunitiesRes.ok || !tempPatternsRes.ok || !clientActRes.ok || !reqMetricsRes.ok || !kanbanRes.ok || !agentPerfRes.ok || !queueMetricsRes.ok) {
         throw new Error(language === 'es' ? 'No se pudieron cargar las metricas' : 'Unable to load analytics');
       }
 
@@ -127,6 +130,7 @@ export function AnalyticsDashboardPage() {
       setRequestMetrics(await reqMetricsRes.json());
       setKanbanMetrics(await kanbanRes.json());
       setAgentPerformance(await agentPerfRes.json());
+      setQueueMetrics(await queueMetricsRes.json());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Analytics error');
     } finally {
@@ -155,7 +159,7 @@ export function AnalyticsDashboardPage() {
         {loading && <div className="analytics-loading">{language === 'es' ? 'Cargando...' : 'Loading...'}</div>}
         {error && <div className="analytics-error">{error}</div>}
 
-        {!loading && !error && overview && quality && coverage && freshness && recommendations && trends && questionClusters && opportunities && temporalPatterns && clientActivity && requestMetrics && kanbanMetrics && agentPerformance && (
+        {!loading && !error && overview && quality && coverage && freshness && recommendations && trends && questionClusters && opportunities && temporalPatterns && clientActivity && requestMetrics && kanbanMetrics && agentPerformance && queueMetrics && (
           <>
             <div className="analytics-cards">
               <article className="analytics-card">
@@ -463,6 +467,48 @@ export function AnalyticsDashboardPage() {
                     <thead><tr><th>{language === 'es' ? 'Agente' : 'Agent'}</th><th>{language === 'es' ? 'Consultas' : 'Queries'}</th><th>{language === 'es' ? 'Confianza Prom' : 'Avg Confidence'}</th><th>{language === 'es' ? 'Latencia Prom' : 'Avg Latency'}</th><th>{language === 'es' ? 'Tasa Aceptación' : 'Acceptance Rate'}</th><th>{language === 'es' ? 'Tokens Totales' : 'Total Tokens'}</th><th>{language === 'es' ? 'Costo Est.' : 'Est. Cost'}</th></tr></thead>
                     <tbody>{agentPerformance.agents.map((item) => (<tr key={item.agent}><td>{item.agent}</td><td>{item.queries}</td><td>{item.avg_confidence}</td><td>{item.avg_latency_ms} ms</td><td>{toPercent(item.acceptance_rate)}</td><td>{item.total_tokens}</td><td>${item.cost_estimate}</td></tr>))}</tbody>
                   </table>
+                )}
+              </section>
+            )}
+
+            {queueMetrics && (
+              <section className="analytics-panel" style={{ marginBottom: 24 }}>
+                <h2>{language === 'es' ? 'Métricas de Cola (Orchestrator)' : 'Queue Metrics (Orchestrator)'}</h2>
+                <div className="analytics-cards">
+                  <article className="analytics-card">
+                    <h3>{language === 'es' ? 'Jobs Totales' : 'Total Jobs'}</h3>
+                    <strong>{queueMetrics.total_jobs}</strong>
+                  </article>
+                  <article className="analytics-card">
+                    <h3>{language === 'es' ? 'Throughput Diario' : 'Daily Throughput'}</h3>
+                    <strong>{queueMetrics.throughput_daily}</strong>
+                  </article>
+                  <article className="analytics-card">
+                    <h3>{language === 'es' ? 'Procesamiento Prom' : 'Avg Processing Time'}</h3>
+                    <strong>{queueMetrics.avg_processing_time_ms} ms</strong>
+                  </article>
+                  <article className="analytics-card">
+                    <h3>{language === 'es' ? 'Espera Prom' : 'Avg Wait Time'}</h3>
+                    <strong>{queueMetrics.avg_wait_time_ms} ms</strong>
+                  </article>
+                  <article className="analytics-card">
+                    <h3>{language === 'es' ? 'Tasa de Fallo' : 'Failure Rate'}</h3>
+                    <strong>{(queueMetrics.failure_rate * 100).toFixed(1)}%</strong>
+                  </article>
+                </div>
+                {queueMetrics.daily_breakdown.length > 0 && (
+                  <div style={{ marginTop: 16 }}>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <BarChart data={queueMetrics.daily_breakdown}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                        <YAxis />
+                        <Tooltip />
+                        <Bar dataKey="completed" fill="#10B981" name={language === 'es' ? 'Completados' : 'Completed'} />
+                        <Bar dataKey="failed" fill="#EF4444" name={language === 'es' ? 'Fallidos' : 'Failed'} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
                 )}
               </section>
             )}

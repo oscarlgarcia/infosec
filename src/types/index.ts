@@ -27,7 +27,8 @@ export type RequestType =
   | 'BC/DR Test Result Request'
   | 'Cloud Customer PT Request'
   | 'Certification Request'
-  | 'Other Support';
+  | 'Other Support'
+  | 'Answer Builder';
 
 export type MessageRole = 'user' | 'assistant' | 'system';
 

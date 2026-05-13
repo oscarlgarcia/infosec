@@ -757,3 +757,77 @@ export async function getAnalyticsAgentPerformance(windowDays: number = 30) {
     agents: agentPerformance.sort((a, b) => b.queries - a.queries)
   };
 }
+
+export async function getAnalyticsQueueMetrics(windowDays: number = 30) {
+  const since = new Date(Date.now() - toMsDay(windowDays));
+  const events = await AnalyticsEvent.find({ timestamp: { $gte: since }, eventType: 'orchestrator_queue' }).lean();
+
+  // Separate by queue_status
+  const enqueuedEvents = events.filter((e: any) => (e.flags || []).includes('queue_status:queued'));
+  const runningEvents = events.filter((e: any) => (e.flags || []).includes('queue_status:running'));
+  const completedEvents = events.filter((e: any) => (e.flags || []).includes('queue_status:completed'));
+  const failedEvents = events.filter((e: any) => (e.flags || []).includes('queue_status:failed'));
+
+  const totalJobs = completedEvents.length + failedEvents.length;
+
+  // Throughput: jobs per day
+  const throughputDaily = totalJobs > 0 && windowDays > 0
+    ? Number((totalJobs / windowDays).toFixed(2))
+    : 0;
+
+  // Average wait time (latencyMs on running events = wait time from enqueue to start)
+  const waitTimes = runningEvents.map((e: any) => e.latencyMs || 0).filter((v: number) => v > 0);
+  const avgWaitTimeMs = waitTimes.length > 0
+    ? Math.round(waitTimes.reduce((a: number, b: number) => a + b, 0) / waitTimes.length)
+    : 0;
+
+  // Average processing time (latencyMs on completed events = processing time)
+  const processingTimes = completedEvents.map((e: any) => e.latencyMs || 0).filter((v: number) => v > 0);
+  const avgProcessingTimeMs = processingTimes.length > 0
+    ? Math.round(processingTimes.reduce((a: number, b: number) => a + b, 0) / processingTimes.length)
+    : 0;
+
+  // Failure rate
+  const failureRate = totalJobs > 0
+    ? Number((failedEvents.length / totalJobs).toFixed(4))
+    : 0;
+
+  // Jobs by status
+  const byStatus = [
+    { status: 'queued', count: enqueuedEvents.length },
+    { status: 'running', count: runningEvents.length },
+    { status: 'completed', count: completedEvents.length },
+    { status: 'failed', count: failedEvents.length },
+  ];
+
+  // Per-day breakdown for chart
+  const dayMap = new Map<string, { completed: number; failed: number; total: number; waitMs: number[]; processMs: number[] }>();
+  for (const evt of [...completedEvents, ...failedEvents] as any[]) {
+    const day = new Date(evt.timestamp).toISOString().slice(0, 10);
+    if (!dayMap.has(day)) dayMap.set(day, { completed: 0, failed: 0, total: 0, waitMs: [], processMs: [] });
+    const entry = dayMap.get(day)!;
+    entry.total += 1;
+    if ((evt.flags || []).includes('queue_status:completed')) entry.completed += 1;
+    if ((evt.flags || []).includes('queue_status:failed')) entry.failed += 1;
+  }
+
+  const dailyBreakdown = [...dayMap.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([date, data]) => ({
+      date,
+      completed: data.completed,
+      failed: data.failed,
+      total: data.total,
+    }));
+
+  return {
+    windowDays,
+    total_jobs: totalJobs,
+    throughput_daily: throughputDaily,
+    avg_wait_time_ms: avgWaitTimeMs,
+    avg_processing_time_ms: avgProcessingTimeMs,
+    failure_rate: failureRate,
+    by_status: byStatus,
+    daily_breakdown: dailyBreakdown,
+  };
+}

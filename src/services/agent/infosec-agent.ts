@@ -1,4 +1,4 @@
-import { chat, createEmbedding } from '../llm/openai';
+import { chat, createProviderEmbedding } from '../llm/openai';
 import { QAEntry } from '../../db/mongo/models';
 import type { Department, AgentResponse } from '../../types';
 
@@ -39,7 +39,7 @@ async function findQAMatches(question: string): Promise<{
 
   let questionEmbedding: number[] = [];
   try {
-    questionEmbedding = await createEmbedding(question);
+    questionEmbedding = await createProviderEmbedding(question);
   } catch (error) {
     console.warn('⚠️ Could not create embedding:', error);
     return { exact: [], similar: [] };
@@ -53,7 +53,7 @@ async function findQAMatches(question: string): Promise<{
     qaEntries.map(async (entry: any) => {
       let entryEmbedding: number[] = [];
       try {
-        entryEmbedding = await createEmbedding(entry.question);
+        entryEmbedding = await createProviderEmbedding(entry.question);
       } catch {
         return { q: entry.question, a: entry.answer, similarity: 0, department: entry.department };
       }

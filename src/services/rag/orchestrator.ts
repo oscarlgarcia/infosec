@@ -1,6 +1,7 @@
 import { Client, QAEntry, CanonicalAnswer, SessionSummary, ResponseTrace, AnalyticsEvent, QuestionCoverage, DocumentUsage, GapBacklog, KbCandidate, AnswerRule } from '../../db/mongo/models';
 import { env } from '../../config';
 import { generateWithResponses, chat } from '../llm/openai';
+import { getLLMSettings } from '../llm/llmSettings';
 import { retrieveRelevantPassages } from './retriever';
 import { getAgentByName } from '../agents/agent.service';
 import { newId, hashQuestion } from '../../utils/ids';
@@ -196,9 +197,8 @@ export async function runChatQuery(input: ChatQueryInput): Promise<ChatQueryOutp
   let citations: Array<{ fileId?: string; filename?: string; score?: number; snippet?: string }> = [];
   let usage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
 
-  const chatModel = !env.OPENAI_API_KEY.startsWith('sk-') || env.OPENAI_API_KEY.includes('placeholder') 
-    ? 'qwen2.5:latest' 
-    : env.OPENAI_MODEL;
+  const settings = await getLLMSettings();
+  const chatModel = settings.activeModel;
 
   if (env.OPENAI_USE_RESPONSES) {
     try {

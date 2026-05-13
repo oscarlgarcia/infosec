@@ -18,7 +18,6 @@ import { QAPage } from './pages/QA'
 import { KnowledgeBasePage } from './pages/KnowledgeBase'
 import { KBDocumentsPage } from './pages/KBDocuments'
 import { KBEmbeddingsPage } from './pages/KBEmbeddings'
-import { AnswerBuilderPage } from './pages/AnswerBuilder'
 import { AnalyticsDashboardPage } from './pages/AnalyticsDashboard'
 import { ContradictionAnalyzerPage } from './pages/ContradictionAnalyzer'
 import { KbCandidatesPage } from './pages/KbCandidates'
@@ -28,6 +27,7 @@ import { AgentsConfigurator } from './pages/AgentsConfigurator'
 import { RulesManager } from './pages/RulesManager'
 import { TasksKanban } from './pages/TasksKanban'
 import { MetricsConfigurator } from './pages/MetricsConfigurator'
+import { OrchestratorJobs } from './pages/OrchestratorJobs'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
@@ -98,14 +98,6 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
               element={
                 <ProtectedRoute>
                   <KBEmbeddingsPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/answer-builder"
-              element={
-                <ProtectedRoute>
-                  <AnswerBuilderPage />
                 </ProtectedRoute>
               }
             />
@@ -186,6 +178,14 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
               element={
                 <ProtectedRoute>
                   <MetricsConfigurator />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/orchestrator"
+              element={
+                <ProtectedRoute>
+                  <OrchestratorJobs />
                 </ProtectedRoute>
               }
             />

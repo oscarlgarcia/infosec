@@ -1,18 +1,48 @@
 import OpenAI from 'openai';
 import { toFile } from 'openai/uploads';
 import { env } from '../../config';
+import { getLLMSettings } from './llmSettings';
 
-const isDummyKey = env.OPENAI_API_KEY.startsWith('dummy') || 
+const isDummyKey = env.OPENAI_API_KEY.startsWith('dummy') ||
   env.OPENAI_API_KEY.includes('placeholder') ||
   env.OPENAI_API_KEY === 'sk-placeholder' ||
   !env.OPENAI_API_KEY.startsWith('sk-');
 const resolvedBaseUrl = env.OPENAI_BASE_URL || (isDummyKey ? 'http://llm-ollama:11434/v1' : undefined);
 const resolvedApiKey = resolvedBaseUrl ? (env.OPENAI_API_KEY || 'dummy') : env.OPENAI_API_KEY;
 
-export const openai = new OpenAI({
+const fallbackClient = new OpenAI({
   baseURL: resolvedBaseUrl,
   apiKey: resolvedApiKey,
 });
+
+let cachedConfigKey: string | null = null;
+let cachedConfigUrl: string | null = null;
+let activeClient: OpenAI | null = null;
+
+export async function getOpenAIClient(): Promise<OpenAI> {
+  try {
+    const settings = await getLLMSettings();
+    const key = settings.provider === 'openai' ? settings.openaiApiKey : 'dummy';
+    const url = settings.provider === 'openai'
+      ? settings.openaiBaseUrl
+      : `http://${settings.ollamaHost}:${settings.ollamaPort}/v1`;
+
+    if (cachedConfigKey !== key || cachedConfigUrl !== url) {
+      activeClient = new OpenAI({ baseURL: url, apiKey: key });
+      cachedConfigKey = key;
+      cachedConfigUrl = url;
+    }
+    return activeClient;
+  } catch {
+    return fallbackClient;
+  }
+}
+
+export async function invalidateClient(): Promise<void> {
+  cachedConfigKey = null;
+  cachedConfigUrl = null;
+  activeClient = null;
+}
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -28,64 +58,103 @@ export interface ChatOptions {
 }
 
 export async function chat(options: ChatOptions): Promise<string> {
-  const { messages, model = 'qwen2.5:latest', temperature = 0.3, maxTokens = 4000 } = options;
-  
-  // DEBUG: Log LLM inputs
+  const { messages, temperature = 0.3, maxTokens = 4000 } = options;
+  const settings = await getLLMSettings();
+  const model = options.model || settings.activeModel;
+
   console.error('[LLM INPUT] Model: ' + model);
   console.error('[LLM INPUT] Messages: ' + JSON.stringify(messages, null, 2));
-  
+
   try {
-    const response = await openai.chat.completions.create({
+    const client = await getOpenAIClient();
+    const response = await client.chat.completions.create({
       model,
       messages,
       temperature,
       max_tokens: maxTokens,
     });
-
     return response.choices[0]?.message?.content || '';
   } catch (error) {
-    console.error('❌ Error calling Ollama:', error);
+    console.error('Error calling LLM:', error);
     throw error;
   }
 }
 
+export async function createProviderEmbedding(text: string): Promise<number[]> {
+  const settings = await getLLMSettings();
+  try {
+    if (settings.provider === 'openai') {
+      const client = await getOpenAIClient();
+      const response = await client.embeddings.create({
+        model: 'text-embedding-3-small',
+        input: text,
+      });
+      return response.data[0]?.embedding || [];
+    }
+  } catch {
+    console.warn('Provider embedding failed, falling back to Ollama');
+  }
+  return createOllamaEmbedding(text);
+}
+
+export async function createProviderEmbeddings(texts: string[]): Promise<number[][]> {
+  const settings = await getLLMSettings();
+  try {
+    if (settings.provider === 'openai') {
+      const client = await getOpenAIClient();
+      const response = await client.embeddings.create({
+        model: 'text-embedding-3-small',
+        input: texts,
+      });
+      return response.data.map(item => item.embedding);
+    }
+  } catch {
+    console.warn('Provider embeddings failed, falling back to Ollama');
+  }
+  return createOllamaEmbeddings(texts);
+}
+
 export async function createEmbedding(text: string): Promise<number[]> {
   try {
-    const response = await openai.embeddings.create({
-      model: 'nomic-embed-text',
+    const client = await getOpenAIClient();
+    const response = await client.embeddings.create({
+      model: 'text-embedding-3-small',
       input: text,
     });
-
     return response.data[0]?.embedding || [];
-  } catch (error) {
-    console.warn('⚠️ Embedding not available, returning empty array');
-    return [];
+  } catch {
+    console.warn('Embedding not available, falling back to Ollama');
+    return createOllamaEmbedding(text);
   }
 }
 
 export async function createEmbeddings(texts: string[]): Promise<number[][]> {
   try {
-    const response = await openai.embeddings.create({
-      model: 'nomic-embed-text',
+    const client = await getOpenAIClient();
+    const response = await client.embeddings.create({
+      model: 'text-embedding-3-small',
       input: texts,
     });
-
     return response.data.map(item => item.embedding);
-  } catch (error) {
-    console.warn('⚠️ OpenAI embeddings not available, trying Ollama direct');
+  } catch {
+    console.warn('OpenAI embeddings not available, trying Ollama direct');
     return createOllamaEmbeddings(texts);
   }
 }
 
 export async function createOllamaEmbedding(text: string): Promise<number[]> {
   const EMBEDDING_MODELS = ['nomic-embed-text', 'mxbai-embed-large', 'snowflake-arctic-embed:latest'];
-  
+
   for (const model of EMBEDDING_MODELS) {
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 60000);
 
-      const response = await fetch('http://llm-ollama:11434/api/embeddings', {
+      const settings = await getLLMSettings().catch(() => null);
+      const host = settings?.ollamaHost || process.env.OLLAMA_HOST || 'llm-ollama';
+      const port = settings?.ollamaPort || process.env.OLLAMA_PORT || '11434';
+
+      const response = await fetch(`http://${host}:${port}/api/embeddings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -104,11 +173,11 @@ export async function createOllamaEmbedding(text: string): Promise<number[]> {
         }
       }
     } catch (error) {
-      console.warn(`⚠️ Model ${model} failed:`, error);
+      console.warn(`Model ${model} failed:`, error);
     }
   }
-  
-  console.error('❌ All embedding models failed');
+
+  console.error('All embedding models failed');
   return [];
 }
 
@@ -117,9 +186,12 @@ export async function createOllamaEmbeddings(texts: string[]): Promise<number[][
 }
 
 export async function* streamChat(options: ChatOptions): AsyncGenerator<string> {
-  const { messages, model = 'qwen2.5:latest', temperature = 0.7, maxTokens = 4000 } = options;
-  
-  const stream = await openai.chat.completions.create({
+  const { messages, temperature = 0.7, maxTokens = 4000 } = options;
+  const settings = await getLLMSettings();
+  const model = options.model || settings.activeModel;
+
+  const client = await getOpenAIClient();
+  const stream = await client.chat.completions.create({
     model,
     messages,
     temperature,
@@ -187,12 +259,13 @@ function extractCitations(response: any): FileSearchCitation[] {
 
 export async function generateWithResponses(options: ResponseGenerationOptions): Promise<ResponseGenerationResult> {
   const { input, instructions, conversationId, vectorStoreIds = [] } = options;
-  const responsesClient = (openai as any).responses;
+  const client = await getOpenAIClient();
+
+  const responsesClient = (client as any).responses;
   if (!responsesClient || typeof responsesClient.create !== 'function') {
     throw new Error('Responses API is not available in current OpenAI SDK/runtime');
   }
 
-  // DEBUG: Log LLM inputs
   console.error('[LLM INPUT] Model: ' + env.OPENAI_MODEL);
   console.error('[LLM INPUT] Instructions: ' + instructions);
   console.error('[LLM INPUT] Input: ' + input);
@@ -245,14 +318,15 @@ export async function uploadFileToVectorStores(args: {
   }
 
   try {
-    const file = await openai.files.create({
+    const client = await getOpenAIClient();
+    const file = await client.files.create({
       file: await toFile(args.buffer, args.filename, { type: args.mimeType || 'application/octet-stream' }),
       purpose: 'assistants',
     });
 
     for (const vectorStoreId of configuredVectorStoreIds) {
       try {
-        const vectorStoresClient = (openai as any).vectorStores;
+        const vectorStoresClient = (client as any).vectorStores;
         if (vectorStoresClient?.files?.create) {
           await vectorStoresClient.files.create(vectorStoreId, { file_id: file.id });
         }
