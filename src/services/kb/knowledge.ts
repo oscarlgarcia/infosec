@@ -109,6 +109,22 @@ export async function uploadDocument(
     },
   });
 
+  if (embedding.length > 0) {
+    try {
+      const client = await getChromaClient();
+      const collection = await client.getOrCreateCollection({ name: CHROMA_COLLECTION });
+      await collection.add({
+        ids: [doc._id.toString()],
+        embeddings: [embedding],
+        documents: [content],
+        metadatas: [{ originalName, department, source: 'document' }],
+      });
+      console.log('✅ Document indexed to ChromaDB:', originalName);
+    } catch (err) {
+      console.error('❌ Failed to index document to ChromaDB:', err);
+    }
+  }
+
   return {
     id: doc._id.toString(),
     filename: doc.filename,

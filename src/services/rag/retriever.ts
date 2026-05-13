@@ -27,6 +27,7 @@ export async function retrieveRelevantPassages(args: {
     { name: 'infosec-kb', sourceType: 'document' as const },
     { name: 'infosec-cms', sourceType: 'cms' as const },
     { name: 'qanda', sourceType: 'qa' as const },
+    { name: 'faq', sourceType: 'faq' as const },
   ];
 
   const perCollectionLimit = Math.ceil(limit / 2); // At least 3 from each

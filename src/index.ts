@@ -114,6 +114,27 @@ async function start() {
       console.error('❌ Error starting orchestrator queue:', queueError);
     }
     
+    // Auto-reindex on startup if enabled in settings
+    try {
+      const { Setting } = await import('./db/mongo/models');
+      const reindexSetting = await Setting.findOne({ key: 'auto_reindex_on_startup' });
+      if (reindexSetting?.value === true) {
+        console.log('🔄 Auto-reindex on startup enabled, starting reindex...');
+        const { reindexDocumentsToChroma } = await import('./services/kb/knowledge');
+        const { reindexQAEntriesToChroma } = await import('./services/qa/qa');
+        Promise.all([
+          reindexDocumentsToChroma(),
+          reindexQAEntriesToChroma(),
+        ]).then(([kb, qa]) => {
+          console.log(`✅ Auto-reindex complete: KB=${kb.success} QA=${qa.success}`);
+        }).catch(err => {
+          console.error('❌ Auto-reindex failed:', err);
+        });
+      }
+    } catch (reindexError) {
+      console.warn('⚠️ Could not check auto-reindex setting:', (reindexError as Error).message);
+    }
+    
     // Test route
     fastify.get('/api/test', async () => ({ status: 'ok', time: new Date().toISOString() }));
     

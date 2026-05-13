@@ -135,6 +135,29 @@ export async function routes(fastify: FastifyInstance) {
     }
   );
 
+  // GET /settings/auto-reindex - Get auto-reindex on startup state
+  fastify.get('/settings/auto-reindex',
+    { preHandler: [verifyToken] },
+    async () => {
+      const setting = await Setting.findOne({ key: 'auto_reindex_on_startup' });
+      return { enabled: setting?.value === true };
+    }
+  );
+
+  // POST /settings/auto-reindex - Update auto-reindex on startup state
+  fastify.post<{ Body: { enabled: boolean } }>('/settings/auto-reindex',
+    { preHandler: [verifyToken, requireRole('admin', 'manager', 'sme')] },
+    async (request, reply) => {
+      const { enabled } = request.body;
+      await Setting.findOneAndUpdate(
+        { key: 'auto_reindex_on_startup' },
+        { key: 'auto_reindex_on_startup', value: enabled, updatedAt: new Date() },
+        { upsert: true }
+      );
+      return { success: true, enabled };
+    }
+  );
+
   // GET /settings/llm - Get LLM configuration (API key never sent to frontend)
   fastify.get('/settings/llm',
     { preHandler: [verifyToken] },

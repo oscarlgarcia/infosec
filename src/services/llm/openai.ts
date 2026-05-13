@@ -148,7 +148,7 @@ export async function createOllamaEmbedding(text: string): Promise<number[]> {
   for (const model of EMBEDDING_MODELS) {
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 60000);
+      const timeout = setTimeout(() => controller.abort(), 120000);
 
       const settings = await getLLMSettings().catch(() => null);
       const host = settings?.ollamaHost || process.env.OLLAMA_HOST || 'llm-ollama';
@@ -181,8 +181,40 @@ export async function createOllamaEmbedding(text: string): Promise<number[]> {
   return [];
 }
 
+async function runWithConcurrencyLimit<T>(tasks: (() => Promise<T>)[], limit: number): Promise<T[]> {
+  const results: T[] = [];
+  const running: Promise<void>[] = [];
+
+  for (const [i, task] of tasks.entries()) {
+    const p = task().then(r => { results[i] = r; });
+    const e = p.then(() => running.splice(running.indexOf(e!), 1));
+    running.push(e!);
+    if (running.length >= limit) {
+      await Promise.race(running);
+    }
+  }
+  await Promise.all(running);
+  return results;
+}
+
 export async function createOllamaEmbeddings(texts: string[]): Promise<number[][]> {
-  return Promise.all(texts.map(text => createOllamaEmbedding(text)));
+  const tasks = texts.map(text => {
+    return async (): Promise<number[]> => {
+      let lastError: unknown;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const result = await createOllamaEmbedding(text);
+          if (result.length > 0) return result;
+        } catch (err) {
+          lastError = err;
+          if (attempt < 2) await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+        }
+      }
+      console.warn(`Embedding failed for text after 3 attempts:`, lastError);
+      return [];
+    };
+  });
+  return runWithConcurrencyLimit(tasks, 2);
 }
 
 export async function* streamChat(options: ChatOptions): AsyncGenerator<string> {

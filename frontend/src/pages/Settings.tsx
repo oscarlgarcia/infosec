@@ -36,6 +36,7 @@ export function Settings() {
   const [reindexDocsLoading, setReindexDocsLoading] = useState(false);
   const [reindexDocsMsg, setReindexDocsMsg] = useState('');
   const [debugLogging, setDebugLogging] = useState(false);
+  const [autoReindex, setAutoReindex] = useState(false);
   const [loading, setLoading] = useState(true);
 
   // LLM Config state
@@ -57,18 +58,23 @@ export function Settings() {
   };
 
   useEffect(() => {
-    const fetchDebugSetting = async () => {
+    const fetchSettings = async () => {
       try {
-        const res = await apiFetch('/settings/llm-debug');
-        const data = await res.json();
-        setDebugLogging(data.enabled);
+        const [debugRes, reindexRes] = await Promise.all([
+          apiFetch('/settings/llm-debug'),
+          apiFetch('/settings/auto-reindex'),
+        ]);
+        const debugData = await debugRes.json();
+        setDebugLogging(debugData.enabled);
+        const reindexData = await reindexRes.json();
+        setAutoReindex(reindexData.enabled);
       } catch (e) {
-        console.error('Failed to fetch debug setting:', e);
+        console.error('Failed to fetch settings:', e);
       } finally {
         setLoading(false);
       }
     };
-    fetchDebugSetting();
+    fetchSettings();
     loadLLMConfig();
   }, []);
 
@@ -176,6 +182,21 @@ export function Settings() {
     } catch (e) {
       console.error('Failed to save debug setting:', e);
       setDebugLogging(!newValue);
+    }
+  };
+
+  const toggleAutoReindex = async () => {
+    const newValue = !autoReindex;
+    setAutoReindex(newValue);
+    try {
+      await apiFetch('/settings/auto-reindex', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: newValue }),
+      });
+    } catch (e) {
+      console.error('Failed to save auto-reindex setting:', e);
+      setAutoReindex(!newValue);
     }
   };
 
@@ -496,6 +517,33 @@ export function Settings() {
             {language === 'es' 
               ? 'Muestra en consola lo que se envía al LLM' 
               : 'Log to console what is sent to the LLM'}
+          </p>
+        </div>
+
+        <div className="settings-section">
+          <h2 className="settings-section-title">
+            {language === 'es' ? 'Auto-Reindex al Inicio' : 'Auto-Reindex on Startup'}
+          </h2>
+          <div className="language-toggle">
+            <span className={`lang-option ${!autoReindex ? 'active' : ''}`}>
+              {language === 'es' ? 'DESACTIVADO' : 'OFF'}
+            </span>
+            <button 
+              className="toggle-switch"
+              onClick={toggleAutoReindex}
+              disabled={loading}
+              aria-label="Toggle auto-reindex on startup"
+            >
+              <span className={`toggle-slider ${autoReindex ? 'right' : 'left'}`}></span>
+            </button>
+            <span className={`lang-option ${autoReindex ? 'active' : ''}`}>
+              {language === 'es' ? 'ACTIVADO' : 'ON'}
+            </span>
+          </div>
+          <p className="language-description">
+            {language === 'es' 
+              ? 'Reindexa KB y QA a ChromaDB automáticamente al arrancar el servidor' 
+              : 'Automatically reindex KB and QA to ChromaDB when the server starts'}
           </p>
         </div>
 
