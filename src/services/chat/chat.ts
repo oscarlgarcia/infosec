@@ -384,6 +384,7 @@ export async function sendMessage(
     timestamp: new Date(),
   };
   conv.messages.push(userMsg);
+  await conv.save();
 
   let responseContent = '';
   let responseId: string | undefined;

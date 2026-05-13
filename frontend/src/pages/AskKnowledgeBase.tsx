@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import type { Client, Chat, Message, Agent, Conversation, ClientRequest } from '../types';
+import { useParams, useNavigate } from 'react-router-dom';
+import type { Client, Chat, Message, Agent, ClientRequest } from '../types';
 import { useLanguage } from '../i18n/LanguageContext';
 import { CreateRequestModal } from '../components/CreateRequestModal';
 import { ViewClientModal } from '../components/ViewClientModal';
@@ -7,20 +8,27 @@ import { ViewRequestModal } from '../components/ViewRequestModal';
 import { Layout } from '../components/Layout';
 import { FormattedMessage } from '../components/FormattedMessage';
 import { useApi, API_URL } from '../contexts/AuthContext';
+import { useChat } from '../contexts/ChatContext';
 import '../styles/App.css';
 
 export function AskKnowledgeBase() {
+  const { conversationId } = useParams<{ conversationId: string }>();
+  const navigate = useNavigate();
   const { language, t } = useLanguage();
   const apiFetch = useApi();
+  const {
+    chats, selectedChatId, messages, sendingConversations,
+    selectChat, createChat, sendMessage, fetchChats, deleteChat, updateChat, setChatsFromContext,
+  } = useChat();
+
+  const isSelectedSending = selectedChatId ? !!sendingConversations[selectedChatId] : false;
+
   const [clients, setClients] = useState<Client[]>([]);
-  const [agents, setAgents] = useState<Agent[]>([]);  // NUEVO: carga dinámica
+  const [agents, setAgents] = useState<Agent[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [requests, setRequests] = useState<ClientRequest[]>([]);
   const [selectedRequestId, setSelectedRequestId] = useState<string>('');
-  const [chats, setChats] = useState<Chat[]>([]);
-  const [selectedChatId, setSelectedChatId] = useState<string>('');
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [editingChatId, setEditingChatId] = useState<string | null>(null);
@@ -33,14 +41,13 @@ export function AskKnowledgeBase() {
   const [viewClientData, setViewClientData] = useState<Client | null>(null);
   const [viewRequestData, setViewRequestData] = useState<ClientRequest | null>(null);
   const [loading, setLoading] = useState(false);
-  const [isSending, setIsSending] = useState(false);
   const [addedMsgIds, setAddedMsgIds] = useState<Set<number>>(new Set());
   const [addingMsgId, setAddingMsgId] = useState<number | null>(null);
+  const isFirstClientMount = useRef(true);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
 
-  // NUEVO: Cargar agents desde la API
   useEffect(() => {
     const loadAgents = async () => {
       try {
@@ -48,7 +55,6 @@ export function AskKnowledgeBase() {
         if (res.ok) {
           const data = await res.json();
           setAgents(data);
-          // Seleccionar el primer agente por defecto
           if (data.length > 0 && !selectedAgent) {
             setSelectedAgent(data[0]);
           }
@@ -117,20 +123,24 @@ export function AskKnowledgeBase() {
   useEffect(() => {
     if (selectedClientId && selectedRequestId) {
       fetchChats(selectedClientId, selectedRequestId);
+    } else if (selectedClientId) {
+      fetchChats(selectedClientId);
     } else {
-      setChats([]);
+      setChatsFromContext([]);
     }
-    setSelectedChatId('');
-    setMessages([]);
+    if (isFirstClientMount.current) {
+      isFirstClientMount.current = false;
+      return;
+    }
+    selectChat(null);
+    navigate('/chat', { replace: true });
   }, [selectedClientId, selectedRequestId]);
 
   useEffect(() => {
-    if (selectedChatId) {
-      fetchMessages(selectedChatId);
-    } else {
-      setMessages([]);
+    if (conversationId && conversationId !== selectedChatId) {
+      selectChat(conversationId);
     }
-  }, [selectedChatId]);
+  }, [conversationId]);
 
   const fetchClients = async () => {
     try {
@@ -138,15 +148,14 @@ export function AskKnowledgeBase() {
       if (!res.ok) throw new Error(`Error fetching clients: ${res.status}`);
       const data = await res.json();
       setClients(data);
-      // If no clients, create a default one
       if (data.length === 0 && !selectedClientId) {
         const createRes = await apiFetch('/clients', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             name: 'Default Client',
-            clientType: 'Cloud'  // Must be valid enum: 'Cloud', 'Rent', 'PS'
-          })
+            clientType: 'Cloud',
+          }),
         });
         if (createRes.ok) {
           const newClient = await createRes.json();
@@ -161,43 +170,14 @@ export function AskKnowledgeBase() {
     }
   };
 
-const fetchRequests = async (clientId: string) => {
+  const fetchRequests = async (clientId: string) => {
     try {
-      // @ts-ignore - Endpoint allowed for client requests
       const res = await apiFetch(`/clients/${clientId}/requests`);
       if (!res.ok) throw new Error(`Error fetching requests: ${res.status}`);
       const data = await res.json();
       setRequests(data);
     } catch (err) {
       console.error('Error fetching requests:', err);
-    }
-  };
-
-  const fetchChats = async (clientId: string, requestId?: string) => {
-    try {
-      const url = requestId 
-        ? `/conversations?clientId=${clientId}&requestId=${requestId}`
-        : `/conversations?clientId=${clientId}`;
-      const res = await apiFetch(url);
-      if (!res.ok) throw new Error(`Error fetching chats: ${res.status}`);
-      const data = await res.json();
-      setChats(data);
-    } catch (err) {
-      console.error('Error fetching chats:', err);
-    }
-  };
-
-  const fetchMessages = async (chatId: string) => {
-    try {
-      setLoading(true);
-      const res = await apiFetch(`/conversations/${chatId}`);
-      if (!res.ok) throw new Error(`Error fetching messages: ${res.status}`);
-      const data: Conversation = await res.json();
-      setMessages(data.messages || []);
-    } catch (err) {
-      console.error('Error fetching messages:', err);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -209,7 +189,6 @@ const fetchRequests = async (clientId: string) => {
         body: JSON.stringify(data),
       });
       if (!res.ok) throw new Error(`Error creating client: ${res.status}`);
-
       const newClient = await res.json();
       setClients(prev => [newClient, ...prev]);
       setSelectedClientId(newClient.id);
@@ -220,9 +199,8 @@ const fetchRequests = async (clientId: string) => {
     }
   };
 
-const handleCreateRequest = async (clientId: string, data: { requestType: string; sectionToReview?: string; deadline?: string; owner?: string; comments?: string }) => {
+  const handleCreateRequest = async (clientId: string, data: { requestType: string; sectionToReview?: string; deadline?: string; owner?: string; comments?: string }) => {
     try {
-      // @ts-ignore - Endpoint allowed for client requests
       const res = await apiFetch(`/clients/${clientId}/requests`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -238,57 +216,28 @@ const handleCreateRequest = async (clientId: string, data: { requestType: string
   };
 
   const handleNewChat = async () => {
-    if (!selectedClientId) return; // Need at least a client
-    try {
-      const res = await apiFetch('/conversations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          clientId: selectedClientId,
-          requestId: selectedRequestId || undefined,
-          title: 'Nueva conversación',
-          agent: selectedAgent?.name || 'InfoSec',
-        }),
-      });
-      if (!res.ok) throw new Error(`Error creating chat: ${res.status}`);
-      const newChat = await res.json();
-      setChats(prev => [newChat, ...prev]);
-      setSelectedChatId(newChat.id);
-    } catch (err) {
-      console.error('Error creating chat:', err);
+    if (!selectedClientId) return;
+    const chat = await createChat(selectedClientId, selectedAgent?.name || 'InfoSec', selectedRequestId);
+    if (chat) {
+      navigate(`/chat/${chat.id}`);
     }
   };
 
+  const handleSelectChat = (id: string) => {
+    navigate(`/chat/${id}`);
+  };
+
   const handleDeleteChat = async (chatId: string) => {
-    try {
-      const res = await apiFetch(`/conversations/${chatId}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error(`Error deleting chat: ${res.status}`);
-      setChats(prev => prev.filter(chat => chat.id !== chatId));
-      if (selectedChatId === chatId) {
-        setSelectedChatId('');
-      }
-      setActiveMenu(null);
-    } catch (err) {
-      console.error('Error deleting chat:', err);
-    }
+    await deleteChat(chatId);
+    setActiveMenu(null);
+    navigate('/chat', { replace: true });
   };
 
   const handleToggleFavorite = async (chatId: string) => {
     const chat = chats.find(c => c.id === chatId);
     if (!chat) return;
-    try {
-      const res = await apiFetch(`/conversations/${chatId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ favorite: !chat.favorite }),
-      });
-      if (!res.ok) throw new Error(`Error toggling favorite: ${res.status}`);
-      const updatedChat = await res.json();
-      setChats(prev => prev.map(c => c.id === chatId ? updatedChat : c));
-      setActiveMenu(null);
-    } catch (err) {
-      console.error('Error toggling favorite:', err);
-    }
+    await updateChat(chatId, { favorite: !chat.favorite });
+    setActiveMenu(null);
   };
 
   const handleStartRename = (chat: Chat) => {
@@ -303,18 +252,7 @@ const handleCreateRequest = async (clientId: string, data: { requestType: string
       setEditingTitle('');
       return;
     }
-    try {
-      const res = await apiFetch(`/conversations/${chatId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: editingTitle.trim() }),
-      });
-      if (!res.ok) throw new Error(`Error renaming chat: ${res.status}`);
-      const updatedChat = await res.json();
-      setChats(prev => prev.map(c => c.id === chatId ? updatedChat : c));
-    } catch (err) {
-      console.error('Error renaming chat:', err);
-    }
+    await updateChat(chatId, { title: editingTitle.trim() });
     setEditingChatId(null);
     setEditingTitle('');
   };
@@ -324,38 +262,10 @@ const handleCreateRequest = async (clientId: string, data: { requestType: string
   };
 
   const handleSendMessage = async () => {
-    if (!inputValue.trim() || !selectedChatId || isSending) return;
-
-    const userMessage: Message = {
-      role: 'user',
-      content: inputValue,
-      timestamp: new Date().toISOString(),
-    };
-
-    setMessages(prev => [...prev, userMessage]);
+    if (!inputValue.trim() || !selectedChatId || isSelectedSending) return;
+    const content = inputValue;
     setInputValue('');
-    setIsSending(true);
-
-    try {
-      const res = await apiFetch(`/conversations/${selectedChatId}/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: inputValue, agent: selectedAgent?.name || 'InfoSec' }),  // NUEVO: envía selectedAgent (string)
-      });
-      if (!res.ok) throw new Error(`Error sending message: ${res.status}`);
-      const data = await res.json();
-      setMessages(data.conversation.messages || []);
-    } catch (err) {
-      console.error('Error sending message:', err);
-      const assistantMessage: Message = {
-        role: 'assistant',
-        content: `Soy el agente ${selectedAgent?.displayName || selectedAgent?.name || 'InfoSec'}. He recibido tu mensaje: "${userMessage.content}". Esta es una respuesta de ejemplo.`,
-        timestamp: new Date().toISOString(),
-      };
-      setMessages(prev => [...prev, assistantMessage]);
-    } finally {
-      setIsSending(false);
-    }
+    sendMessage(selectedChatId, content, selectedAgent?.name || 'InfoSec');
   };
 
   const filteredChats = chats.filter(chat =>
@@ -394,8 +304,8 @@ const handleCreateRequest = async (clientId: string, data: { requestType: string
       <div className="sidebar-header">
         <span className="sidebar-title">{t('conversations')}</span>
         {clients.length > 0 && (
-          <button 
-            className="new-chat-btn" 
+          <button
+            className="new-chat-btn"
             onClick={() => setShowCreateRequestModal(true)}
             style={{ marginTop: 8 }}
           >
@@ -464,8 +374,10 @@ const handleCreateRequest = async (clientId: string, data: { requestType: string
               />
             ) : (
               <>
-                <span className="chat-icon" onClick={() => setSelectedChatId(chat.id)}>💬</span>
-                <span className="chat-title" onClick={() => setSelectedChatId(chat.id)}>
+                <span className="chat-icon" onClick={() => handleSelectChat(chat.id)}>
+                  {sendingConversations[chat.id] ? '⏳' : '💬'}
+                </span>
+                <span className="chat-title" onClick={() => handleSelectChat(chat.id)}>
                   {chat.favorite && <span className="favorite-star">⭐</span>}
                   {chat.title}
                 </span>
@@ -491,7 +403,7 @@ const handleCreateRequest = async (clientId: string, data: { requestType: string
     </>
   );
 
-const chatContent = (
+  const chatContent = (
     <>
       {selectedClientId && selectedClient && (
         <div className="client-info-bar">
@@ -510,7 +422,7 @@ const chatContent = (
               </span>
             )}
           </div>
-<div className="client-info-actions">
+          <div className="client-info-actions">
             {selectedRequestId && (
               <>
                 <button
@@ -543,7 +455,7 @@ const chatContent = (
               <div className="empty-state">
                 <div className="empty-text">{t('loading')}</div>
               </div>
-            ) : messages.length === 0 && !isSending ? (
+            ) : messages.length === 0 && !isSelectedSending ? (
               <div className="empty-state">
                 <div className="empty-icon">💬</div>
                 <div className="empty-title">{t('newConversation')}</div>
@@ -606,7 +518,7 @@ const chatContent = (
                     </div>
                   </div>
                 ))}
-                {isSending && (
+                {isSelectedSending && (
                   <div className="message assistant">
                     <div className="typing-indicator">
                       <span></span>
@@ -659,9 +571,9 @@ const chatContent = (
                 <button
                   className="search-btn"
                   onClick={handleSendMessage}
-                  disabled={!inputValue.trim() || isSending}
+                  disabled={!inputValue.trim() || isSelectedSending}
                 >
-                  {isSending ? t('loading') : t('search')}
+                  {isSelectedSending ? t('loading') : t('search')}
                 </button>
               </div>
             </div>

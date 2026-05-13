@@ -503,6 +503,9 @@ export async function reindexQAEntriesToChroma(): Promise<{ success: number; fai
       if (success % 20 === 0) {
         console.log(`✅ Indexed ${success}/${entries.length}`);
       }
+
+      await new Promise(r => setTimeout(r, 50));
+
     } catch (err) {
       console.error(`❌ Failed to index ${entry._id}:`, err);
       failed++;

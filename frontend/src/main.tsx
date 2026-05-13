@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { LanguageProvider } from './i18n/LanguageContext'
 import { AuthProvider } from './contexts/AuthContext'
+import { ChatProvider } from './contexts/ChatContext'
 import './styles/App.css'
 import { Home } from './pages/Home'
 import { AskKnowledgeBase } from './pages/AskKnowledgeBase'
@@ -33,6 +34,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <AuthProvider>
       <LanguageProvider>
+        <ChatProvider>
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<LoginPage />} />
@@ -47,6 +49,14 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             />
             <Route
               path="/chat"
+              element={
+                <ProtectedRoute>
+                  <AskKnowledgeBase />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/chat/:conversationId"
               element={
                 <ProtectedRoute>
                   <AskKnowledgeBase />
@@ -191,6 +201,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             />
           </Routes>
         </BrowserRouter>
+      </ChatProvider>
       </LanguageProvider>
     </AuthProvider>
   </React.StrictMode>,

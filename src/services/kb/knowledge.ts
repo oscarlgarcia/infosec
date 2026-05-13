@@ -346,7 +346,9 @@ export async function semanticSearchDocuments(
         
         success += validItems.length;
         failed += (batch.length - validItems.length);
-        
+
+        await new Promise(r => setTimeout(r, 50));
+
       } catch (err) {
         console.error(`❌ Failed to index batch starting at ${i}:`, err);
         failed += batch.length;
