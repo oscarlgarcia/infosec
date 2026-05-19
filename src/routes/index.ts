@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { Setting } from '../db/mongo/models';
-import { generateKnowledgeGraph, getGraphStats } from '../services/knowledgeGraph';
+import { generateKnowledgeGraph, generateTermGraph, getGraphStats } from '../services/knowledgeGraph';
 import { analyzeGap } from '../services/gapFinder';
 import { getLLMSettings, saveLLMSettings } from '../services/llm/llmSettings';
 import {
@@ -13,6 +13,7 @@ import {
 } from '../services/kb/knowledge';
 import {
   getAllQA,
+  getQAById,
   createQA,
   updateQA,
   deleteQA,
@@ -1082,6 +1083,16 @@ export async function routes(fastify: FastifyInstance) {
     return getAllQA();
   });
 
+  fastify.get<{ Params: { id: string } }>(
+    '/qa/:id',
+    { preHandler: [verifyToken] },
+    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+      const entry = await getQAById(request.params.id);
+      if (!entry) return reply.code(404).send({ error: 'Not found' });
+      return entry;
+    }
+  );
+
   fastify.post<{ Body: { questionNumber?: string; question: string; answer: string; department?: Department; infoSecDomain?: string; source?: string } }>(
     '/qa',
     { preHandler: [verifyToken, requireRole('admin', 'manager', 'sme')] },
@@ -1535,6 +1546,11 @@ fastify.get('/knowledge-graph',
   { preHandler: [verifyToken, requireRole('admin', 'manager', 'sme')] },
   async (request, reply) => {
     try {
+      const query = request.query as any;
+      if (query?.term) {
+        const graphData = await generateTermGraph(query.term);
+        return graphData;
+      }
       const graphData = await generateKnowledgeGraph();
       return graphData;
     } catch (error) {
@@ -1582,4 +1598,12 @@ fastify.get<{ Querystring: { q: string; topK?: number } }>(
   // Orchestrator routes
   const { orchestratorRoutes } = await import('./orchestrator.routes');
   fastify.register(orchestratorRoutes);
+
+  // Report routes
+  const { reportRoutes } = await import('./report.routes');
+  fastify.register(reportRoutes);
+
+  // Canonical answer routes
+  const { canonicalRoutes } = await import('./canonical.routes');
+  fastify.register(canonicalRoutes);
 }

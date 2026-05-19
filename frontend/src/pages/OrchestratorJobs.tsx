@@ -95,6 +95,7 @@ export function OrchestratorJobs() {
   const [requests, setRequests] = useState<ClientRequest[]>([]);
 
   const [expandedJob, setExpandedJob] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
   const [notifEnabled, setNotifEnabled] = useState(() => 'Notification' in window && Notification.permission === 'granted');
   const prevStatusRef = useRef<Record<string, string>>({});
 
@@ -289,6 +290,10 @@ export function OrchestratorJobs() {
     return `${(ms / 1000).toFixed(1)}s`;
   };
 
+  const pageSize = 10;
+  const totalPages = Math.ceil(jobs.length / pageSize);
+  const displayedJobs = jobs.length > 10 ? jobs.slice((page - 1) * pageSize, page * pageSize) : jobs;
+
   if (loading) return (
     <Layout>
       <div className="analytics-loading">Loading jobs...</div>
@@ -463,7 +468,7 @@ export function OrchestratorJobs() {
 
         {jobs.length === 0 && <p style={{ color: 'var(--gray-500)' }}>No jobs yet.</p>}
 
-        {jobs.map((job) => {
+        {displayedJobs.map((job) => {
           const isExpanded = expandedJob === job.id;
           return (
             <div key={job.id} className="analytics-panel" style={{ padding: 0, marginBottom: 12, overflow: 'hidden' }}>
@@ -620,6 +625,13 @@ export function OrchestratorJobs() {
             </div>
           );
         })}
+        {jobs.length > 10 && totalPages > 1 && (
+          <div className="pagination">
+            <button disabled={page <= 1} onClick={() => setPage(p => p - 1)}>← Prev</button>
+            <span>{page} / {totalPages}</span>
+            <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>Next →</button>
+          </div>
+        )}
       </div>
     </Layout>
   );

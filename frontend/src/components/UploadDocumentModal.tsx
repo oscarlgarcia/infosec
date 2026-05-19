@@ -33,7 +33,7 @@ export function UploadDocumentModal({ isOpen, onClose }: UploadDocumentModalProp
       const formData = new FormData();
       formData.append('file', uploadFile);
 
-      const res = await apiFetch(`/knowledge-base/documents?department=${encodeURIComponent(uploadDepartment)}`, {
+      const res = await apiFetch(`/api/knowledge-base/documents?department=${encodeURIComponent(uploadDepartment)}`, {
         method: 'POST',
         body: formData,
         signal: controller.signal,

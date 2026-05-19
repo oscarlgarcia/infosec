@@ -77,6 +77,7 @@ export function QAPage() {
   
   const [entries, setEntries] = useState<QAEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [page, setPage] = useState(1);
   const [isImporting, setIsImporting] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>('');
@@ -103,6 +104,7 @@ export function QAPage() {
     if (res.ok) {
       const data = await res.json();
       setEntries(data);
+      setPage(1);
     }
     setIsLoading(false);
   };
@@ -246,9 +248,13 @@ export function QAPage() {
     return aNum[1] - bNum[1];
   });
 
+  const pageSize = 10;
+  const totalPages = Math.ceil(sortedEntries.length / pageSize);
+  const displayedEntries = sortedEntries.length > 15 ? sortedEntries.slice((page - 1) * pageSize, page * pageSize) : sortedEntries;
+
   return (
     <Layout>
-      <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto', overflowY: 'auto', maxHeight: 'calc(100vh - 100px)' }}>
+      <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto', overflowY: 'auto', maxHeight: 'calc(100vh - 100px)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
           <div>
             <span style={{ display: 'inline-flex', marginBottom: '14px', padding: '8px 12px', borderRadius: '999px', background: 'rgba(13, 58, 122, 0.08)', color: '#0d3a7a', fontSize: '12px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Knowledge Base</span>
@@ -437,7 +443,7 @@ export function QAPage() {
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {sortedEntries.map((entry) => (
+                {displayedEntries.map((entry) => (
                   <div
                     key={entry.id}
                     style={{ padding: '16px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}
@@ -477,6 +483,13 @@ export function QAPage() {
                     <div style={{ color: '#475569', fontSize: '14px', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>{highlightText(entry.answer, filter)}</div>
                   </div>
                 ))}
+              </div>
+            )}
+            {sortedEntries.length > 15 && totalPages > 1 && (
+              <div className="pagination">
+                <button disabled={page <= 1} onClick={() => setPage(p => p - 1)}>← {language === 'es' ? 'Anterior' : 'Prev'}</button>
+                <span>{page} / {totalPages}</span>
+                <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>{language === 'es' ? 'Siguiente' : 'Next'} →</button>
               </div>
             )}
           </div>

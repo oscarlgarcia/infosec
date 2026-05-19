@@ -113,6 +113,15 @@ async function start() {
     } catch (queueError) {
       console.error('❌ Error starting orchestrator queue:', queueError);
     }
+
+    // Start report scheduler
+    try {
+      const { startReportScheduler } = await import('./services/reports/scheduler');
+      startReportScheduler();
+      console.log('✅ Report scheduler started');
+    } catch (schedulerError) {
+      console.error('❌ Error starting report scheduler:', schedulerError);
+    }
     
     // Auto-reindex on startup if enabled in settings
     try {

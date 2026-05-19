@@ -23,6 +23,13 @@ import { AnalyticsDashboardPage } from './pages/AnalyticsDashboard'
 import { ContradictionAnalyzerPage } from './pages/ContradictionAnalyzer'
 import { KbCandidatesPage } from './pages/KbCandidates'
 import { KnowledgeGraphPage } from './pages/KnowledgeGraph'
+import { KnowledgeCenter } from './pages/KnowledgeCenter'
+import { TermReportNew } from './pages/TermReportNew'
+import { TermReportList } from './pages/TermReportList'
+import { TermReportDetail } from './pages/TermReportDetail'
+import { ScheduledReports } from './pages/ScheduledReports'
+import { ScheduleDetail } from './pages/ScheduleDetail'
+import { CanonicalAnswers } from './pages/CanonicalAnswers'
 import { GapFinderPage } from './pages/GapFinder'
 import { AgentsConfigurator } from './pages/AgentsConfigurator'
 import { RulesManager } from './pages/RulesManager'
@@ -140,6 +147,70 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
               element={
                 <ProtectedRoute>
                   <QAPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/knowledge-center"
+              element={
+                <ProtectedRoute>
+                  <KnowledgeCenter />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/knowledge-center/reports/new"
+              element={
+                <ProtectedRoute>
+                  <TermReportNew />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/knowledge-center/reports"
+              element={
+                <ProtectedRoute>
+                  <TermReportList />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/knowledge-center/reports/:id"
+              element={
+                <ProtectedRoute>
+                  <TermReportDetail />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/knowledge-center/scheduled"
+              element={
+                <ProtectedRoute>
+                  <ScheduledReports />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/knowledge-center/scheduled/:id"
+              element={
+                <ProtectedRoute>
+                  <ScheduleDetail />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/knowledge-center/canonical"
+              element={
+                <ProtectedRoute>
+                  <CanonicalAnswers />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/knowledge-center/graph"
+              element={
+                <ProtectedRoute>
+                  <KnowledgeGraphPage />
                 </ProtectedRoute>
               }
             />

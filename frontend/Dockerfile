@@ -58,7 +58,7 @@ server {
     }
 
     # API routes (root-level OK - no SPA route conflict, e.g. GET /agents)
-    location ~ ^/(agents|rules|users|clients|conversations|task-lists|documents|requests|auth)(/|$) {
+    location ~ ^/(agents|rules|users|clients|conversations|task-lists|requests|auth)(/|$) {
         rewrite ^/(.*)$ /api/$1 break;
         proxy_pass http://infosec-backend:3000;
         proxy_http_version 1.1;

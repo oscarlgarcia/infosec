@@ -25,6 +25,7 @@ export function KBDocumentsPage() {
   const apiFetch = useApi();
   const [documents, setDocuments] = useState<KBDocument[]>([]);
   const [filter, setFilter] = useState<string>('');
+  const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
 
@@ -43,6 +44,12 @@ export function KBDocumentsPage() {
     setIsLoading(false);
   };
 
+  useEffect(() => { setPage(1); }, [documents]);
+
+  const pageSize = 10;
+  const totalPages = Math.ceil(documents.length / pageSize);
+  const displayedDocs = documents.length > 15 ? documents.slice((page - 1) * pageSize, page * pageSize) : documents;
+
   const handleDelete = async (id: string) => {
     if (!window.confirm(language === 'es' ? '¿Eliminar documento?' : 'Delete document?')) {
       return;
@@ -55,7 +62,7 @@ export function KBDocumentsPage() {
 
   return (
     <Layout>
-      <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
+      <div style={{ maxWidth: '1600px', margin: '0 auto', maxHeight: '1000px', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
           <div>
             <span style={{ display: 'inline-flex', marginBottom: '14px', padding: '8px 12px', borderRadius: '999px', background: 'rgba(13, 58, 122, 0.08)', color: '#0d3a7a', fontSize: '12px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Knowledge Base</span>
@@ -112,52 +119,59 @@ export function KBDocumentsPage() {
             {language === 'es' ? 'No hay documentos' : 'No documents'}
           </div>
         ) : (
-          <table className="kb-docs-table">
+          <table style={{ width: '1600px', tableLayout: 'fixed', borderCollapse: 'collapse', background: 'white', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
             <thead>
-              <tr>
-                <th>{language === 'es' ? 'Nombre' : 'Name'}</th>
-                <th>{language === 'es' ? 'Departamento' : 'Department'}</th>
-                <th>{language === 'es' ? 'Fecha' : 'Date'}</th>
-                <th>{language === 'es' ? 'Última indexación' : 'Last indexed'}</th>
-                <th>{language === 'es' ? 'Tamaño' : 'Size'}</th>
-                <th>{language === 'es' ? 'Acción' : 'Action'}</th>
+              <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                <th style={{ width: '55%', padding: '12px 16px', textAlign: 'left', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontWeight: '600' }}>{language === 'es' ? 'Nombre' : 'Name'}</th>
+                <th style={{ width: '9%', padding: '12px 16px', textAlign: 'left', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontWeight: '600' }}>{language === 'es' ? 'Departamento' : 'Department'}</th>
+                <th style={{ width: '9%', padding: '12px 16px', textAlign: 'left', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontWeight: '600' }}>{language === 'es' ? 'Fecha' : 'Date'}</th>
+                <th style={{ width: '9%', padding: '12px 16px', textAlign: 'left', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontWeight: '600' }}>{language === 'es' ? 'Última indexación' : 'Last indexed'}</th>
+                <th style={{ width: '9%', padding: '12px 16px', textAlign: 'left', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontWeight: '600' }}>{language === 'es' ? 'Tamaño' : 'Size'}</th>
+                <th style={{ width: '9%', padding: '12px 16px', textAlign: 'left', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontWeight: '600' }}>{language === 'es' ? 'Acción' : 'Action'}</th>
               </tr>
             </thead>
             <tbody>
-              {documents.map((doc) => (
-                <tr key={doc.id}>
-                  <td>
-                    {doc.path ? (
-                      <a 
-                        href={`${API_URL}${doc.path}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="kb-doc-link"
+              {displayedDocs.map((doc) => (
+                  <tr key={doc.id}>
+                    <td style={{ width: '55%', padding: '12px 16px' }}>
+                      {doc.path ? (
+                        <a 
+                          href={`${API_URL}${doc.path}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="kb-doc-link"
+                        >
+                          📄 {doc.originalName}
+                        </a>
+                      ) : (
+                        <span>📄 {doc.originalName}</span>
+                      )}
+                    </td>
+                    <td style={{ width: '9%', padding: '12px 16px' }}>{doc.department}</td>
+                    <td style={{ width: '9%', padding: '12px 16px' }}>{new Date(doc.createdAt).toLocaleDateString()}</td>
+                    <td style={{ width: '9%', padding: '12px 16px' }}>{doc.lastIndexedAt ? new Date(doc.lastIndexedAt).toLocaleDateString() : (language === 'es' ? 'No indexado' : 'Not indexed')}</td>
+                    <td style={{ width: '9%', padding: '12px 16px' }}>{(doc.metadata?.size || 0) / (1024 * 1024) > 0.01 ? ((doc.metadata?.size || 0) / (1024 * 1024)).toFixed(2) + ' MB' : '< 0.01 MB'}</td>
+                    <td style={{ width: '9%', padding: '12px 16px' }}>
+                      <button
+                        type="button"
+                        className="btn-icon"
+                        title={language === 'es' ? 'Eliminar' : 'Delete'}
+                        onClick={() => handleDelete(doc.id)}
                       >
-                        📄 {doc.originalName}
-                      </a>
-                    ) : (
-                      <span>📄 {doc.originalName}</span>
-                    )}
-                  </td>
-                  <td>{doc.department}</td>
-                  <td>{new Date(doc.createdAt).toLocaleDateString()}</td>
-                  <td>{doc.lastIndexedAt ? new Date(doc.lastIndexedAt).toLocaleDateString() : (language === 'es' ? 'No indexado' : 'Not indexed')}</td>
-                  <td>{(doc.metadata?.size || 0) / (1024 * 1024) > 0.01 ? ((doc.metadata?.size || 0) / (1024 * 1024)).toFixed(2) + ' MB' : '< 0.01 MB'}</td>
-                  <td>
-                    <button
-                      type="button"
-                      className="btn-icon"
-                      title={language === 'es' ? 'Eliminar' : 'Delete'}
-                      onClick={() => handleDelete(doc.id)}
-                    >
-                      🗑️
-                    </button>
-                  </td>
+                        🗑️
+                      </button>
+                    </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        )}
+        {documents.length > 15 && totalPages > 1 && (
+          <div className="pagination">
+            <button disabled={page <= 1} onClick={() => setPage(p => p - 1)}>← {language === 'es' ? 'Anterior' : 'Prev'}</button>
+            <span>{page} / {totalPages}</span>
+            <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>{language === 'es' ? 'Siguiente' : 'Next'} →</button>
+          </div>
         )}
       </div>
 

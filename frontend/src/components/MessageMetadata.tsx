@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { Message } from '../types';
+import { SourceViewModal } from './SourceViewModal';
 
 interface MessageMetadataProps {
   metadata: NonNullable<Message['metadata']>;
@@ -139,18 +140,14 @@ interface SourceChipProps {
   onClick?: () => void;
 }
 
-function SourceChip({ source, onClick }: SourceChipProps) {
+function SourceChip({ source }: SourceChipProps) {
   const [expanded, setExpanded] = useState(false);
-
-  const handleClick = () => {
-    setExpanded(!expanded);
-    if (onClick) onClick();
-  };
+  const [modalOpen, setModalOpen] = useState(false);
 
   return (
     <div 
       className={`source-chip source-type-${source.sourceType}`}
-      onClick={handleClick}
+      onClick={() => setExpanded(!expanded)}
     >
       <span className="source-type-badge">{source.sourceType.toUpperCase()}</span>
       <span className="source-title">{source.title}</span>
@@ -165,13 +162,18 @@ function SourceChip({ source, onClick }: SourceChipProps) {
             className="source-view-btn"
             onClick={(e) => { 
               e.stopPropagation(); 
-              alert(`Ver fuente: ${source.title}\nID: ${source.itemId}\nTipo: ${source.sourceType}`);
+              setModalOpen(true);
             }}
           >
             Ver fuente completa
           </button>
         </div>
       )}
+      <SourceViewModal
+        source={source}
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+      />
     </div>
   );
 }

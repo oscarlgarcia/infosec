@@ -36,7 +36,9 @@ export function KbCandidatesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [candidates, setCandidates] = useState<KbCandidate[]>([]);
-  const [notification, setNotification] = useState<string>('');
+  const [page, setPage] = useState(1);
+  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [processingId, setProcessingId] = useState<string | null>(null);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState({ question: '', suggestedAnswer: '', domain: '' });
@@ -55,6 +57,7 @@ export function KbCandidatesPage() {
         throw new Error(language === 'es' ? 'No se pudieron cargar los candidatos' : 'Unable to load candidates');
       }
       setCandidates(await res.json());
+      setPage(1);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Candidates error');
     } finally {
@@ -63,21 +66,34 @@ export function KbCandidatesPage() {
   };
 
   const handleDecision = async (id: string, action: 'approve' | 'reject') => {
-    const res = await apiFetch(`/kb/candidates/${id}/${action}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ note: action === 'approve' ? 'Approved and saved to Q&A' : 'Rejected' }),
-    });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      alert(data.message || data.error || 'Decision failed');
-      return;
+    setProcessingId(id);
+    try {
+      const res = await apiFetch(`/kb/candidates/${id}/${action}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note: action === 'approve' ? 'Approved and saved to Q&A' : 'Rejected' }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setNotification({ message: data.message || data.error || 'Decision failed', type: 'error' });
+        setTimeout(() => setNotification(null), 4000);
+        return;
+      }
+      const result = await res.json();
+      if (action === 'approve') {
+        if (result.alreadyApproved) {
+          setNotification({ message: language === 'es' ? 'El candidato ya había sido aprobado' : 'Candidate was already approved', type: 'error' });
+        } else {
+          setNotification({ message: language === 'es' ? 'Candidato aprobado y guardado en Q&A' : 'Candidate approved and saved to Q&A', type: 'success' });
+        }
+      } else {
+        setNotification({ message: language === 'es' ? 'Candidato rechazado' : 'Candidate rejected', type: 'success' });
+      }
+      setTimeout(() => setNotification(null), 3000);
+      await fetchCandidates();
+    } finally {
+      setProcessingId(null);
     }
-    if (action === 'approve') {
-      setNotification(language === 'es' ? 'Candidato aprobado y guardado en Q&A' : 'Candidate approved and saved to Q&A');
-      setTimeout(() => setNotification(''), 3000);
-    }
-    await fetchCandidates();
   };
 
   const startEdit = (item: KbCandidate) => {
@@ -109,11 +125,15 @@ export function KbCandidatesPage() {
     await fetchCandidates();
   };
 
+  const pageSize = 10;
+  const totalPages = Math.ceil(candidates.length / pageSize);
+  const displayedCandidates = candidates.length > 15 ? candidates.slice((page - 1) * pageSize, page * pageSize) : candidates;
+
   return (
     <Layout>
       <div className="kb-candidates-page">
         {notification && (
-          <div className="kb-notification">{notification}</div>
+          <div className={`kb-notification ${notification.type === 'error' ? 'kb-notification-error' : ''}`}>{notification.message}</div>
         )}
         <div className="kb-candidates-header">
           <h1>{language === 'es' ? 'Candidatos de Knowledge Base' : 'Knowledge Base Candidates'}</h1>
@@ -134,6 +154,7 @@ export function KbCandidatesPage() {
         {error && <div className="analytics-error">{error}</div>}
 
         {!loading && !error && (
+          <div style={{ overflowY: 'auto', maxHeight: '500px' }}>
           <table className="analytics-table">
             <thead>
               <tr>
@@ -145,7 +166,7 @@ export function KbCandidatesPage() {
               </tr>
             </thead>
             <tbody>
-              {candidates.map((item) => (
+              {displayedCandidates.map((item) => (
                 <tr key={item._id}>
                   <td>
                     {editingId === item._id ? (
@@ -204,11 +225,11 @@ export function KbCandidatesPage() {
                       <div className="kb-candidate-actions">
                         {item.status === 'draft' || item.status === 'in_review' ? (
                           <>
-                            <button type="button" className="btn-primary" onClick={() => void handleDecision(item._id, 'approve')}>
-                              {language === 'es' ? 'Aprobar' : 'Approve'}
+                            <button type="button" className="btn-primary" onClick={() => void handleDecision(item._id, 'approve')} disabled={processingId !== null}>
+                              {processingId === item._id ? (language === 'es' ? 'Aprobando...' : 'Approving...') : (language === 'es' ? 'Aprobar' : 'Approve')}
                             </button>
-                            <button type="button" className="btn-secondary" onClick={() => void handleDecision(item._id, 'reject')}>
-                              {language === 'es' ? 'Rechazar' : 'Reject'}
+                            <button type="button" className="btn-secondary" onClick={() => void handleDecision(item._id, 'reject')} disabled={processingId !== null}>
+                              {processingId === item._id ? (language === 'es' ? 'Rechazando...' : 'Rejecting...') : (language === 'es' ? 'Rechazar' : 'Reject')}
                             </button>
                           </>
                         ) : null}
@@ -222,6 +243,14 @@ export function KbCandidatesPage() {
               ))}
             </tbody>
           </table>
+          </div>
+        )}
+        {candidates.length > 15 && totalPages > 1 && (
+          <div className="pagination">
+            <button disabled={page <= 1} onClick={() => setPage(p => p - 1)}>← {language === 'es' ? 'Anterior' : 'Prev'}</button>
+            <span>{page} / {totalPages}</span>
+            <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>{language === 'es' ? 'Siguiente' : 'Next'} →</button>
+          </div>
         )}
       </div>
     </Layout>

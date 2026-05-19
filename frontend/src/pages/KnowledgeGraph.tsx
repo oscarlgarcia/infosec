@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, FormEvent } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import ForceGraph2D, { ForceGraphMethods } from 'react-force-graph-2d';
 import { Layout } from '../components/Layout';
 import { useApi, API_URL } from '../contexts/AuthContext';
@@ -7,10 +8,12 @@ import { useLanguage } from '../i18n/LanguageContext';
 interface GraphNode {
   id: string;
   label: string;
-  type: 'cms' | 'faq' | 'qanda' | 'document';
+  type: 'cms' | 'faq' | 'qanda' | 'document' | 'term' | 'canonical';
   title?: string;
   category?: string;
   department?: string;
+  score?: number;
+  sourceCount?: number;
 }
 
 interface GraphLink {
@@ -27,6 +30,7 @@ interface GraphData {
 interface GraphStats {
   totalNodes: number;
   cmsNodes: number;
+  faqNodes: number;
   qandaNodes: number;
   documentNodes: number;
   totalLinks: number;
@@ -36,7 +40,9 @@ const TYPE_COLORS: Record<string, string> = {
   cms: '#2765C8',
   faq: '#78E0B0',
   qanda: '#6A3CE8',
-  document: '#F39325'
+  document: '#F39325',
+  term: '#E53935',
+  canonical: '#FF8F00'
 };
 
 export function KnowledgeGraphPage() {
@@ -44,12 +50,15 @@ export function KnowledgeGraphPage() {
   const apiFetch = useApi();
   const graphRef = useRef<ForceGraphMethods>();
   const containerRef = useRef<HTMLDivElement>(null);
-  
+  const [searchParams, setSearchParams] = useSearchParams();
+  const termParam = searchParams.get('term') || '';
+
   const [graphData, setGraphData] = useState<GraphData>({ nodes: [], links: [] });
   const [stats, setStats] = useState<GraphStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
+  const [searchTerm, setSearchTerm] = useState(termParam);
 
   useEffect(() => {
     if (containerRef.current) {
@@ -64,20 +73,24 @@ export function KnowledgeGraphPage() {
     async function loadGraph() {
       try {
         setLoading(true);
-        
+        setSelectedNode(null);
+
+        const term = searchParams.get('term');
+        const graphUrl = term ? `/api/knowledge-graph?term=${encodeURIComponent(term)}` : '/api/knowledge-graph';
+
         const [graphRes, statsRes] = await Promise.all([
-          apiFetch('/api/knowledge-graph'),
+          apiFetch(graphUrl),
           apiFetch('/api/knowledge-graph/stats')
         ]);
-        
+
         if (graphRes.ok) {
-          const graphData = await graphRes.json();
-          setGraphData(graphData);
+          const data = await graphRes.json();
+          setGraphData(data);
         }
-        
+
         if (statsRes.ok) {
-          const statsData = await statsRes.json();
-          setStats(statsData);
+          const data = await statsRes.json();
+          setStats(data);
         }
       } catch (error) {
         console.error('Error loading knowledge graph:', error);
@@ -85,13 +98,26 @@ export function KnowledgeGraphPage() {
         setLoading(false);
       }
     }
-    
+
     loadGraph();
-  }, [apiFetch]);
+  }, [apiFetch, searchParams]);
+
+  const handleSearch = (e: FormEvent) => {
+    e.preventDefault();
+    if (searchTerm.trim()) {
+      setSearchParams({ term: searchTerm.trim() });
+    } else {
+      setSearchParams({});
+    }
+  };
+
+  const handleClearSearch = () => {
+    setSearchTerm('');
+    setSearchParams({});
+  };
 
   const handleNodeClick = useCallback((node: GraphNode) => {
     setSelectedNode(node);
-    
     if (graphRef.current) {
       graphRef.current.centerAt(0, 0, 1000);
       graphRef.current.zoom(1.5, 1000);
@@ -119,6 +145,29 @@ export function KnowledgeGraphPage() {
           <h1>{t('Knowledge Graph', 'Grafo de Conocimiento')}</h1>
           <p>{t('Interactive visualization of your knowledge base', 'Visualización interactiva de tu base de conocimiento')}</p>
         </div>
+
+        <form className="kg-search-bar" onSubmit={handleSearch}>
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder={t('Search for a term...', 'Buscar un término...')}
+            className="search-input"
+          />
+          <button type="submit" className="btn btn-primary">{t('Search', 'Buscar')}</button>
+          {termParam && (
+            <button type="button" className="btn" onClick={handleClearSearch}>
+              {t('Clear', 'Limpiar')}
+            </button>
+          )}
+        </form>
+
+        {termParam && (
+          <div className="kg-active-term">
+            <strong>{t('Active term', 'Término activo')}:</strong> {termParam}
+            <span className="kg-node-count"> — {graphData.nodes.length} {t('results', 'resultados')}</span>
+          </div>
+        )}
 
         {stats && (
           <div className="kg-stats">
@@ -204,6 +253,18 @@ export function KnowledgeGraphPage() {
                 <div className="kg-node-field">
                   <label>{t('Department', 'Departamento')}:</label>
                   <span>{selectedNode.department}</span>
+                </div>
+              )}
+              {selectedNode.score !== undefined && (
+                <div className="kg-node-field">
+                  <label>{t('Relevance', 'Relevancia')}:</label>
+                  <span>{selectedNode.score}%</span>
+                </div>
+              )}
+              {selectedNode.sourceCount !== undefined && (
+                <div className="kg-node-field">
+                  <label>{t('Sources', 'Fuentes')}:</label>
+                  <span>{selectedNode.sourceCount}</span>
                 </div>
               )}
               <div className="kg-node-field">

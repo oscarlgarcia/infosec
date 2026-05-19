@@ -48,6 +48,7 @@ export async function listKbCandidates(status?: string) {
 export async function approveKbCandidate(id: string, reviewer: string, note?: string) {
   const candidate = await KbCandidate.findById(id);
   if (!candidate) return null;
+  if (candidate.status === 'approved') return { candidate: candidate.toObject(), qaEntry: null, alreadyApproved: true };
 
   const questionNumber = await getNextQuestionNumber(candidate.domain || 'general');
   

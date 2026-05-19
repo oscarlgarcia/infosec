@@ -469,6 +469,79 @@ export const QuestionCoverage = mongoose.models.QuestionCoverage || mongoose.mod
 export const DocumentUsage = mongoose.models.DocumentUsage || mongoose.model('DocumentUsage', DocumentUsageSchema);
 export const GapBacklog = mongoose.models.GapBacklog || mongoose.model('GapBacklog', GapBacklogSchema);
 
+// Term Report Models
+const TermReportSourceSchema = new Schema({
+  sourceType: { type: String, enum: ['cms', 'faq', 'qa', 'document'], required: true },
+  itemId: String, title: String, score: Number,
+}, { _id: false });
+
+const TermReportQASchema = new Schema({
+  question: String, answer: String, sourceType: String,
+  itemId: String, score: Number, isDirect: Boolean,
+}, { _id: false });
+
+const TermReportCanonicalSchema = new Schema({
+  canonicalId: { type: Schema.Types.ObjectId, ref: 'CanonicalAnswer' },
+  question: String, currentAnswer: String,
+  status: String, owner: String, verified: Boolean,
+}, { _id: false });
+
+const TermReportGapSchema = new Schema({
+  topic: String, recommendation: String, impactScore: Number,
+}, { _id: false });
+
+const TermReportContradictionSchema = new Schema({
+  left: String, right: String, severity: String, sources: [String],
+}, { _id: false });
+
+const TermReportSchema = new Schema({
+  term: { type: String, required: true, index: true },
+  definition: String,
+  directQA: [TermReportQASchema],
+  relatedTopics: [TermReportQASchema],
+  canonicalAnswers: [TermReportCanonicalSchema],
+  sourcesUsed: [TermReportSourceSchema],
+  coverageGaps: [TermReportGapSchema],
+  contradictions: [TermReportContradictionSchema],
+  summary: String,
+  metrics: {
+    totalSources: Number, gapCount: Number,
+    contradictionCount: Number, canonicalCount: Number,
+    avgConfidence: Number,
+  },
+  generatedBy: String,
+}, { timestamps: true });
+
+const TermReportScheduleSchema = new Schema({
+  term: { type: String, required: true },
+  frequency: { type: String, enum: ['daily', 'weekly', 'monthly'], default: 'weekly' },
+  enabled: { type: Boolean, default: true },
+  lastRunAt: { type: Date },
+  nextRunAt: { type: Date },
+  createdBy: { type: String },
+  notifyOnChanges: { type: Boolean, default: true },
+  scheduleHour: { type: Number, default: 0 },
+  scheduleMinute: { type: Number, default: 0 },
+  dayOfWeek: { type: Number },
+  dayOfMonth: { type: Number },
+}, { timestamps: true });
+
+const TermReportSnapshotSchema = new Schema({
+  term: { type: String, required: true },
+  scheduleId: { type: Schema.Types.ObjectId, ref: 'TermReportSchedule' },
+  report: { type: Schema.Types.Mixed },
+  metrics: {
+    totalSources: Number, gapCount: Number,
+    contradictionCount: Number, canonicalCount: Number,
+    avgConfidence: Number,
+  },
+  generatedAt: { type: Date, default: Date.now },
+});
+
+export const TermReport = mongoose.models.TermReport || mongoose.model('TermReport', TermReportSchema);
+export const TermReportSchedule = mongoose.models.TermReportSchedule || mongoose.model('TermReportSchedule', TermReportScheduleSchema);
+export const TermReportSnapshot = mongoose.models.TermReportSnapshot || mongoose.model('TermReportSnapshot', TermReportSnapshotSchema);
+
 
 // Task Kanban Models
 export const TaskListSchema = new Schema({

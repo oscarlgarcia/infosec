@@ -28,6 +28,7 @@ export function AdminHome() {
 
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState<UserData | null>(null);
   const [error, setError] = useState('');
@@ -42,6 +43,8 @@ export function AdminHome() {
   useEffect(() => {
     fetchUsers();
   }, []);
+
+  useEffect(() => { setPage(1); }, [users]);
 
   async function fetchUsers() {
     try {
@@ -171,6 +174,10 @@ export function AdminHome() {
     };
   }, [users]);
 
+  const pageSize = 10;
+  const totalPages = Math.ceil(users.length / pageSize);
+  const displayedUsers = users.length > 15 ? users.slice((page - 1) * pageSize, page * pageSize) : users;
+
   return (
     <Layout>
       <div className="settings-page" style={{ maxWidth: 'none' }}>
@@ -274,8 +281,8 @@ export function AdminHome() {
               {language === 'es' ? 'No hay usuarios' : 'No users found'}
             </div>
           ) : (
-            <div className="file-list">
-              {users.map((user) => (
+            <div className="file-list" style={{ overflowY: 'auto', maxHeight: '600px' }}>
+              {displayedUsers.map((user) => (
                 <div
                   key={user._id}
                   className="file-item"
@@ -394,6 +401,13 @@ export function AdminHome() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+          {users.length > 15 && totalPages > 1 && (
+            <div className="pagination">
+              <button disabled={page <= 1} onClick={() => setPage(p => p - 1)}>← {language === 'es' ? 'Anterior' : 'Prev'}</button>
+              <span>{page} / {totalPages}</span>
+              <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>{language === 'es' ? 'Siguiente' : 'Next'} →</button>
             </div>
           )}
         </div>

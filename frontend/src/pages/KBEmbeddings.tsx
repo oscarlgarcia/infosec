@@ -22,6 +22,7 @@ export function KBEmbeddingsPage() {
   const apiFetch = useApi();
   const [documents, setDocuments] = useState<DocumentWithEmbedding[]>([]);
   const [filter, setFilter] = useState<string>('');
+  const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState<DocumentWithEmbedding | null>(null);
 
@@ -40,9 +41,15 @@ export function KBEmbeddingsPage() {
     setIsLoading(false);
   };
 
+  useEffect(() => { setPage(1); }, [documents]);
+
+  const pageSize = 10;
+  const totalPages = Math.ceil(documents.length / pageSize);
+  const displayedDocs = documents.length > 15 ? documents.slice((page - 1) * pageSize, page * pageSize) : documents;
+
   return (
     <Layout>
-      <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
+      <div style={{ maxWidth: '1600px', margin: '0 auto', maxHeight: '1000px', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
           <div>
             <span style={{ display: 'inline-flex', marginBottom: '14px', padding: '8px 12px', borderRadius: '999px', background: 'rgba(13, 58, 122, 0.08)', color: '#0d3a7a', fontSize: '12px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Knowledge Base</span>
@@ -75,22 +82,22 @@ export function KBEmbeddingsPage() {
             {language === 'es' ? 'Cargando...' : 'Loading...'}
           </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+          <table style={{ width: '1600px', tableLayout: 'fixed', borderCollapse: 'collapse', background: 'white', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
             <thead>
-              <tr>
-                <th style={{ padding: '12px 16px', textAlign: 'left', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontWeight: '600' }}>
+              <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                <th style={{ width: '60%', padding: '12px 16px', textAlign: 'left', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontWeight: '600' }}>
                   {language === 'es' ? 'Nombre' : 'Name'}
                 </th>
-                <th style={{ padding: '12px 16px', textAlign: 'left', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontWeight: '600' }}>
+                <th style={{ width: '10%', padding: '12px 16px', textAlign: 'left', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontWeight: '600' }}>
                   {language === 'es' ? 'Departamento' : 'Department'}
                 </th>
-                <th style={{ padding: '12px 16px', textAlign: 'left', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontWeight: '600' }}>
+                <th style={{ width: '10%', padding: '12px 16px', textAlign: 'left', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontWeight: '600' }}>
                   Embedding
                 </th>
-                <th style={{ padding: '12px 16px', textAlign: 'left', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontWeight: '600' }}>
+                <th style={{ width: '10%', padding: '12px 16px', textAlign: 'left', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontWeight: '600' }}>
                   {language === 'es' ? 'Estado' : 'Status'}
                 </th>
-                <th style={{ padding: '12px 16px', textAlign: 'left', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontWeight: '600' }}>
+                <th style={{ width: '10%', padding: '12px 16px', textAlign: 'left', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontWeight: '600' }}>
                   {language === 'es' ? 'Fecha' : 'Date'}
                 </th>
               </tr>
@@ -98,16 +105,16 @@ export function KBEmbeddingsPage() {
             <tbody>
               {documents.length === 0 ? (
                 <tr>
-                  <td colSpan={4} style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
+                    <td colSpan={5} style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
                     {language === 'es' ? 'No hay documentos' : 'No documents'}
                   </td>
                 </tr>
               ) : (
-                documents.map((doc) => (
+                displayedDocs.map((doc) => (
                   <tr key={doc.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                    <td style={{ padding: '12px 16px' }}>{doc.originalName}</td>
-                    <td style={{ padding: '12px 16px' }}>{doc.department}</td>
-                    <td style={{ padding: '12px 16px' }}>
+                    <td style={{ width: '60%', padding: '12px 16px' }}>{doc.originalName}</td>
+                    <td style={{ width: '10%', padding: '12px 16px' }}>{doc.department}</td>
+                    <td style={{ width: '10%', padding: '12px 16px', whiteSpace: 'nowrap' }}>
                       {doc.embedding && doc.embedding.length > 0 ? (
                         <button
                           type="button"
@@ -126,15 +133,22 @@ export function KBEmbeddingsPage() {
                         </button>
                       )}
                     </td>
-                    <td style={{ padding: '12px 16px', fontSize: '13px', color: doc.embeddingStatus === 'generated' ? '#16a34a' : doc.embeddingStatus === 'failed' ? '#dc2626' : '#ca8a04' }}>
+                    <td style={{ width: '10%', padding: '12px 16px', fontSize: '13px', color: doc.embeddingStatus === 'generated' ? '#16a34a' : doc.embeddingStatus === 'failed' ? '#dc2626' : '#ca8a04' }}>
                       {doc.embeddingStatus === 'generated' ? '✅ Generado' : doc.embeddingStatus === 'failed' ? '❌ Error' : '⏳ Pendiente'}
                     </td>
-                    <td style={{ padding: '12px 16px' }}>{new Date(doc.createdAt).toLocaleDateString()}</td>
+                    <td style={{ width: '10%', padding: '12px 16px' }}>{new Date(doc.createdAt).toLocaleDateString()}</td>
                   </tr>
                 ))
               )}
             </tbody>
           </table>
+        )}
+        {documents.length > 15 && totalPages > 1 && (
+          <div className="pagination">
+            <button disabled={page <= 1} onClick={() => setPage(p => p - 1)}>← {language === 'es' ? 'Anterior' : 'Prev'}</button>
+            <span>{page} / {totalPages}</span>
+            <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>{language === 'es' ? 'Siguiente' : 'Next'} →</button>
+          </div>
         )}
 
         {selectedDoc && (

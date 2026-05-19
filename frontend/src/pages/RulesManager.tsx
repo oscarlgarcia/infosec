@@ -10,6 +10,7 @@ export function RulesManager() {
   const apiFetch = useApi();
   const [rules, setRules] = useState<AnswerRule[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingRule, setEditingRule] = useState<AnswerRule | null>(null);
@@ -31,6 +32,7 @@ export function RulesManager() {
       const agentsData = await agentsRes.json();
       
       setRules(rulesData);
+      setPage(1);
       setAgents(agentsData);
     } catch (err: any) {
       setError(err.message || 'Failed to load data');
@@ -103,6 +105,10 @@ export function RulesManager() {
       .join(', ');
   };
 
+  const pageSize = 10;
+  const totalPages = Math.ceil(rules.length / pageSize);
+  const displayedRules = rules.length > 15 ? rules.slice((page - 1) * pageSize, page * pageSize) : rules;
+
   return (
     <Layout>
       <div className="agents-configurator">
@@ -124,7 +130,7 @@ export function RulesManager() {
         {loading ? (
           <div className="loading">{language === 'es' ? 'Cargando...' : 'Loading...'}</div>
         ) : (
-          <div className="table-container">
+          <div className="table-container" style={{ overflowY: 'auto', maxHeight: '500px' }}>
             <table className="agents-table">
               <thead>
                 <tr>
@@ -136,7 +142,7 @@ export function RulesManager() {
                 </tr>
               </thead>
               <tbody>
-                {rules.map(rule => (
+                {displayedRules.map(rule => (
                   <tr key={(rule as any)._id || rule._id}>
                     <td>
                       <strong>{(rule as any).name || rule.name}</strong>
@@ -170,6 +176,13 @@ export function RulesManager() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+        {rules.length > 15 && totalPages > 1 && (
+          <div className="pagination">
+            <button disabled={page <= 1} onClick={() => setPage(p => p - 1)}>← {language === 'es' ? 'Anterior' : 'Prev'}</button>
+            <span>{page} / {totalPages}</span>
+            <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>{language === 'es' ? 'Siguiente' : 'Next'} →</button>
           </div>
         )}
       </div>

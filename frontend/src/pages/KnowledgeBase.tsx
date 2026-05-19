@@ -31,6 +31,7 @@ export function KnowledgeBasePage() {
   const [query, setQuery] = useState('');
   const [selectedSources, setSelectedSources] = useState<KnowledgeSourceType[]>([]);
   const [results, setResults] = useState<KnowledgeSearchResponse['results']>([]);
+  const [page, setPage] = useState(1);
   const [summary, setSummary] = useState<KnowledgeSummaryResponse | null>(null);
   const [selectedItem, setSelectedItem] = useState<KnowledgeItem | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -61,7 +62,7 @@ export function KnowledgeBasePage() {
   }, []);
 
   const fetchItem = async (sourceType: KnowledgeSourceType, id: string, syncUrl: boolean = true) => {
-    const res = await apiFetch(`/knowledge-base/items/${sourceType}/${id}`);
+    const res = await apiFetch(`/api/knowledge-base/items/${sourceType}/${id}`);
     if (!res.ok) throw new Error(`Error fetching item: ${res.status}`);
     const data = await res.json();
     setSelectedItem(data);
@@ -99,9 +100,9 @@ export function KnowledgeBasePage() {
       const sourceTypes = sources.length > 0 ? sources : SOURCE_OPTIONS.map((s) => s.value);
       
       const [unifiedRes, docRes] = await Promise.all([
-        apiFetch(`/knowledge-base/search?q=${encodeURIComponent(searchQuery)}&sourceTypes=${sourceTypes.join(',')}`),
+        apiFetch(`/api/knowledge-base/search?q=${encodeURIComponent(searchQuery)}&sourceTypes=${sourceTypes.join(',')}`),
         sourceTypes.includes('document') || sourceTypes.length === 0
-          ? apiFetch(`/documents/search?q=${encodeURIComponent(searchQuery)}&limit=10`)
+          ? apiFetch(`/api/kb/documents/search?q=${encodeURIComponent(searchQuery)}&limit=10`)
           : Promise.resolve({ ok: true, json: () => Promise.resolve({ results: [] }) })
       ]);
       
@@ -127,6 +128,7 @@ export function KnowledgeBasePage() {
       
       const allResults = [...(unifiedData.results || []), ...docResults];
       setResults(allResults);
+      setPage(1);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Search error');
     } finally {
@@ -139,7 +141,7 @@ export function KnowledgeBasePage() {
 
     setIsSummarizing(true);
     try {
-      const res = await apiFetch('/knowledge-base/summary', {
+      const res = await apiFetch('/api/knowledge-base/summary', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -170,6 +172,10 @@ export function KnowledgeBasePage() {
       </div>
     </div>
   );
+
+  const pageSize = 10;
+  const totalPages = Math.ceil(results.length / pageSize);
+  const displayedResults = results.length > 15 ? results.slice((page - 1) * pageSize, page * pageSize) : results;
 
   return (
     <Layout sidebarContent={sidebarContent}>
@@ -227,8 +233,8 @@ export function KnowledgeBasePage() {
                   : (language === 'es' ? 'Lanza una consulta para empezar.' : 'Run a search to get started.')}
               </div>
             ) : (
-              <div className="kb-results-list">
-                {results.map((result) => (
+              <div className="kb-results-list" style={{ overflowY: 'auto', maxHeight: '500px' }}>
+                {displayedResults.map((result) => (
                   <article key={itemKey(result)} className="kb-result-card">
                     <div className="kb-result-meta">
                       <span>{result.metadata.sourceLabel}</span>
@@ -248,6 +254,13 @@ export function KnowledgeBasePage() {
                     </div>
                   </article>
                 ))}
+              </div>
+            )}
+            {results.length > 15 && totalPages > 1 && (
+              <div className="pagination">
+                <button disabled={page <= 1} onClick={() => setPage(p => p - 1)}>← {language === 'es' ? 'Anterior' : 'Prev'}</button>
+                <span>{page} / {totalPages}</span>
+                <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>{language === 'es' ? 'Siguiente' : 'Next'} →</button>
               </div>
             )}
           </section>
