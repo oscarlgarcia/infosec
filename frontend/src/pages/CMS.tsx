@@ -511,9 +511,9 @@ export function CMS() {
       {tags.length > 0 && (
         <div className="cms-sb-section">
           <div className="cms-sb-section-title">{t('Tags', 'Etiquetas')}</div>
-          {tags.map((t: any) => (
-            <div key={t._id} className="cms-sb-item" style={{ fontSize: 12 }}>
-              <span className="cms-tag-dot" style={{ background: t.color || '#6B7280' }} /> {t.name}
+          {tags.map((tag: any) => (
+            <div key={tag._id} className="cms-sb-item" style={{ fontSize: 12 }}>
+              <span className="cms-tag-dot" style={{ background: tag.color || '#6B7280' }} /> {tag.name}
             </div>
           ))}
         </div>
@@ -910,11 +910,11 @@ export function CMS() {
               </tr>
             </thead>
             <tbody>
-              {tags.map((t: any) => (
-                <tr key={t._id}>
-                  <td><span className="cms-tag-badge" style={{ background: t.color || '#E5E7EB', color: t.color ? '#fff' : '#333' }}>{t.name}</span></td>
+              {tags.map((tag: any) => (
+                <tr key={tag._id}>
+                  <td><span className="cms-tag-badge" style={{ background: tag.color || '#E5E7EB', color: tag.color ? '#fff' : '#333' }}>{tag.name}</span></td>
                   <td className="cms-td-actions">
-                    <button className="cms-action-btn" title={t('Delete', 'Eliminar')} onClick={() => handleDeleteTag(t._id)}>🗗</button>
+                    <button className="cms-action-btn" title={t('Delete', 'Eliminar')} onClick={() => handleDeleteTag(tag._id)}>🗗</button>
                   </td>
                 </tr>
               ))}
