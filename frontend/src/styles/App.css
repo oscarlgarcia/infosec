@@ -7429,25 +7429,7 @@ body {
 }
 
 /* ── Site Index (public tree view) ── */
-.site-index {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  background: #f9fafb;
-}
-
-.site-index-body {
-  flex: 1;
-  display: flex;
-  overflow: hidden;
-}
-
 .site-index-sidebar {
-  width: 260px;
-  background: white;
-  border-right: 1px solid var(--gray-200);
-  overflow-y: auto;
-  flex-shrink: 0;
   padding: 12px 0;
 }
 
