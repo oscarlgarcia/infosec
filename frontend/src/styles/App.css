@@ -7002,12 +7002,9 @@ body {
   padding: 40px 24px;
 }
 
-.site-article {
-  margin: 0 auto;
-  background: white;
-  border-radius: 12px;
-  padding: 40px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+.site-page-content {
+  padding: 32px;
+  box-sizing: border-box;
 }
 
 .site-title {
@@ -7431,6 +7428,9 @@ body {
 /* ── Site Index (public tree view) ── */
 .site-index-sidebar {
   padding: 12px 0;
+  background: white;
+  height: 100%;
+  box-sizing: border-box;
 }
 
 .site-index-sidebar-title {

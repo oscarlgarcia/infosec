@@ -103,13 +103,11 @@ export function SiteIndex() {
     );
   }
 
-  const isIndex = !slug || slug === 'index';
-
   return (
     <Layout sidebarContent={sidebarContent}>
       {page ? (
-        <article className="site-article">
-          <h1 className="site-title">{isIndex ? 'Home' : page.title}</h1>
+        <div className="site-page-content">
+          <h1 className="site-title">{page.title}</h1>
           {page.summary && <p className="site-summary">{page.summary}</p>}
           {page.tags.length > 0 && (
             <div className="site-meta">
@@ -119,7 +117,7 @@ export function SiteIndex() {
             </div>
           )}
           <div className="site-content" dangerouslySetInnerHTML={{ __html: page.content }} />
-        </article>
+        </div>
       ) : (
         <div className="site-index-empty">
           <h2>Page not found</h2>
