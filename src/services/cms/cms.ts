@@ -98,6 +98,7 @@ export async function createContentPage(data: {
   content: string;
   summary?: string;
   categoryId?: string;
+  parentId?: string;
   tags?: string[];
   status?: 'draft' | 'published' | 'archived';
   authorId?: string;
@@ -106,6 +107,7 @@ export async function createContentPage(data: {
   const normalizedData = {
     ...data,
     categoryId: data.categoryId?.trim() ? data.categoryId.trim() : undefined,
+    parentId: data.parentId?.trim() ? data.parentId.trim() : undefined,
   };
   
   const page = await ContentPage.create({
@@ -132,6 +134,7 @@ export async function updateContentPage(id: string, data: Partial<{
   content: string;
   summary: string;
   categoryId: string;
+  parentId: string;
   tags: string[];
   status: 'draft' | 'published' | 'archived';
   relatedContent: string[];
@@ -145,6 +148,9 @@ export async function updateContentPage(id: string, data: Partial<{
     categoryId: typeof data.categoryId === 'string'
       ? (data.categoryId.trim() ? data.categoryId.trim() : undefined)
       : data.categoryId,
+    parentId: typeof data.parentId === 'string'
+      ? (data.parentId.trim() ? data.parentId.trim() : undefined)
+      : data.parentId,
   };
   
   if (data.content && data.content !== page.content) {
