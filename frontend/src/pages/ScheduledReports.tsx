@@ -11,6 +11,18 @@ export function ScheduledReports() {
   const [searchParams] = useSearchParams();
   const t = (es: string, en: string) => language === 'es' ? es : en;
 
+  const offset = new Date().getTimezoneOffset();
+  const toUtc = (localHour: number, localMinute: number) => {
+    const total = localHour * 60 + localMinute + offset;
+    const clamped = ((total % 1440) + 1440) % 1440;
+    return { hour: Math.floor(clamped / 60), minute: Math.round(clamped % 60) };
+  };
+  const toLocal = (utcHour: number, utcMinute: number) => {
+    const total = utcHour * 60 + utcMinute - offset;
+    const clamped = ((total % 1440) + 1440) % 1440;
+    return { hour: Math.floor(clamped / 60), minute: Math.round(clamped % 60) };
+  };
+
   const [schedules, setSchedules] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -48,7 +60,8 @@ export function ScheduledReports() {
 
   const openEdit = (s: any) => {
     setEditSchedule(s);
-    setFormData({ term: s.term, frequency: s.frequency, notifyOnChanges: s.notifyOnChanges !== false, scheduleHour: s.scheduleHour ?? 8, scheduleMinute: s.scheduleMinute ?? 0, dayOfWeek: s.dayOfWeek ?? 1, dayOfMonth: s.dayOfMonth ?? 1 });
+    const local = toLocal(s.scheduleHour ?? 0, s.scheduleMinute ?? 0);
+    setFormData({ term: s.term, frequency: s.frequency, notifyOnChanges: s.notifyOnChanges !== false, scheduleHour: local.hour, scheduleMinute: local.minute, dayOfWeek: s.dayOfWeek ?? 1, dayOfMonth: s.dayOfMonth ?? 1 });
     setShowModal(true);
   };
 
@@ -56,6 +69,7 @@ export function ScheduledReports() {
     try {
       const url = editSchedule ? `/api/reports/schedules/${editSchedule._id}` : '/api/reports/schedules';
       const method = editSchedule ? 'PUT' : 'POST';
+      const utc = toUtc(formData.scheduleHour, formData.scheduleMinute);
       const res = await apiFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
@@ -63,8 +77,8 @@ export function ScheduledReports() {
           term: formData.term,
           frequency: formData.frequency,
           notifyOnChanges: formData.notifyOnChanges,
-          scheduleHour: formData.scheduleHour,
-          scheduleMinute: formData.scheduleMinute,
+          scheduleHour: utc.hour,
+          scheduleMinute: utc.minute,
           dayOfWeek: formData.dayOfWeek,
           dayOfMonth: formData.dayOfMonth,
         }),
@@ -125,8 +139,9 @@ export function ScheduledReports() {
   const DAYS_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   const scheduleLabel = (s: any) => {
-    const h = pad(s.scheduleHour ?? 0);
-    const m = pad(s.scheduleMinute ?? 0);
+    const local = toLocal(s.scheduleHour ?? 0, s.scheduleMinute ?? 0);
+    const h = pad(local.hour);
+    const m = pad(local.minute);
     const days = language === 'es' ? DAYS_ES : DAYS_EN;
     switch (s.frequency) {
       case 'daily': return `${t('Daily', 'Diario')} ${h}:${m}`;
@@ -170,8 +185,8 @@ export function ScheduledReports() {
                   <tr key={s._id} className="clickable" onClick={() => navigate(`/knowledge-center/scheduled/${s._id}`)}>
                     <td><strong>{s.term}</strong></td>
                     <td>{scheduleLabel(s)}</td>
-                    <td>{s.lastRunAt ? new Date(s.lastRunAt).toLocaleDateString() : '-'}</td>
-                    <td>{s.nextRunAt ? new Date(s.nextRunAt).toLocaleDateString() : '-'}</td>
+                    <td>{s.lastRunAt ? new Date(s.lastRunAt).toLocaleString() : '-'}</td>
+                    <td>{s.nextRunAt ? new Date(s.nextRunAt).toLocaleString() : '-'}</td>
                   <td>
                     <span className={`tr-status-badge tr-status-${s.enabled ? 'approved' : 'rejected'}`}>
                       {s.enabled ? '🟢 On' : '🔴 Off'}

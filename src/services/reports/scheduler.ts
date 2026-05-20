@@ -38,12 +38,16 @@ function calculateNextRun(frequency: string, hour: number = 0, minute: number = 
 
 async function processDueSchedules() {
   try {
+    const now = new Date();
+    console.log(`[Report Scheduler] Poll at ${now.toISOString()}, checking for due schedules...`);
     const schedules = await TermReportSchedule.find({
       enabled: true,
-      nextRunAt: { $lte: new Date() },
+      nextRunAt: { $lte: now },
     }).lean();
 
+    console.log(`[Report Scheduler] Found ${schedules.length} due schedules`);
     for (const schedule of schedules) {
+      console.log(`[Report Scheduler] Processing schedule "${schedule.term}" (id=${schedule._id}), nextRunAt=${schedule.nextRunAt}, hour=${schedule.scheduleHour}, min=${schedule.scheduleMinute}, freq=${schedule.frequency}`);
       try {
         const report = await generateTermReport({
           term: schedule.term,
