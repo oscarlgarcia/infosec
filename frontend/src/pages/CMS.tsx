@@ -56,6 +56,8 @@ export function CMS() {
   const [recent, setRecent] = useState<RecentAccess[]>([]);
   const [searchResults, setSearchResults] = useState<ContentPage[]>([]);
   const [showNewCategory, setShowNewCategory] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [editingTag, setEditingTag] = useState<any | null>(null);
 
   const [filter, setFilter] = useState({ status: '', categoryId: '', search: '' });
   const [sortKey, setSortKey] = useState<string>('updatedAt');
@@ -68,6 +70,7 @@ export function CMS() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [tags, setTags] = useState<string[]>([]);
   const [newTagName, setNewTagName] = useState('');
+  const [newTagColor, setNewTagColor] = useState('');
   const [categoryForm, setCategoryForm] = useState({ name: '', description: '' });
   const [expandedTreeIds, setExpandedTreeIds] = useState<Set<string>>(new Set());
 
@@ -271,28 +274,36 @@ export function CMS() {
 
   const handleCreateCategory = async () => {
     try {
-      await apiFetch('/cms/categories', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(categoryForm) });
-      setShowNewCategory(false); setCategoryForm({ name: '', description: '' }); fetchCategories();
-    } catch (e) { console.error('createCategory', e); }
+      if (editingCategory) {
+        await apiFetch(`/cms/categories/${editingCategory._id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(categoryForm) });
+      } else {
+        await apiFetch('/cms/categories', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(categoryForm) });
+      }
+      setShowNewCategory(false); setEditingCategory(null); setCategoryForm({ name: '', description: '' }); fetchCategories();
+    } catch (e) { console.error('saveCategory', e); }
   };
 
   const handleDeleteCategory = async (id: string) => {
     if (!confirm(t('Delete category?', '¿Eliminar categoría?'))) return;
-    try { await apiFetch(`/cms/categories/${id}`, { method: 'DELETE' }); fetchCategories(); }
+    try { await apiFetch(`/cms/categories/${id}`, { method: 'DELETE' }); setEditingCategory(null); fetchCategories(); }
     catch (e) { console.error('deleteCategory', e); }
-  };
+  }; 
 
   const handleCreateTag = async () => {
     if (!newTagName.trim()) return;
     try {
-      await apiFetch('/cms/tags', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newTagName }) });
-      setNewTagName(''); fetchTags();
-    } catch (e) { console.error('createTag', e); }
+      if (editingTag) {
+        await apiFetch(`/cms/tags/${editingTag._id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newTagName, color: newTagColor }) });
+      } else {
+        await apiFetch('/cms/tags', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newTagName, color: newTagColor }) });
+      }
+      setNewTagName(''); setNewTagColor(''); setEditingTag(null); fetchTags();
+    } catch (e) { console.error('saveTag', e); }
   };
 
   const handleDeleteTag = async (id: string) => {
     if (!confirm(t('Delete tag?', '¿Eliminar etiqueta?'))) return;
-    try { await apiFetch(`/cms/tags/${id}`, { method: 'DELETE' }); fetchTags(); }
+    try { await apiFetch(`/cms/tags/${id}`, { method: 'DELETE' }); setEditingTag(null); fetchTags(); }
     catch (e) { console.error('deleteTag', e); }
   };
 
@@ -554,12 +565,12 @@ export function CMS() {
     <div className="cms-tab-content">
       <div className="cms-tab-header">
         <h2>{t('Categories', 'Categorías')}</h2>
-        <button className="btn-primary btn-sm" onClick={() => setShowNewCategory(true)}>+ {t('New', 'Nueva')}</button>
+        <button className="btn-primary btn-sm" onClick={() => { setShowNewCategory(true); setEditingCategory(null); setCategoryForm({ name: '', description: '' }); }}>+ {t('New', 'Nueva')}</button>
       </div>
 
-      {showNewCategory && (
+      {(showNewCategory || editingCategory) && (
         <div className="cms-card cms-card-form">
-          <h4>{t('New Category', 'Nueva Categoría')}</h4>
+          <h4>{editingCategory ? t('Edit Category', 'Editar Categoría') : t('New Category', 'Nueva Categoría')}</h4>
           <div className="cms-form">
             <div className="form-group">
               <label>{t('Name', 'Nombre')}</label>
@@ -570,8 +581,8 @@ export function CMS() {
               <textarea value={categoryForm.description} onChange={e => setCategoryForm({ ...categoryForm, description: e.target.value })} rows={3} />
             </div>
             <div className="form-actions">
-              <button className="btn-cancel" onClick={() => setShowNewCategory(false)}>{t('Cancel', 'Cancelar')}</button>
-              <button className="btn-submit" onClick={handleCreateCategory}>{t('Create', 'Crear')}</button>
+              <button className="btn-cancel" onClick={() => { setShowNewCategory(false); setEditingCategory(null); setCategoryForm({ name: '', description: '' }); }}>{t('Cancel', 'Cancelar')}</button>
+              <button className="btn-submit" onClick={handleCreateCategory}>{editingCategory ? t('Save', 'Guardar') : t('Create', 'Crear')}</button>
             </div>
           </div>
         </div>
@@ -597,6 +608,7 @@ export function CMS() {
                   <td>{pageCountByCategory[cat._id] || 0}</td>
                   <td className="cms-td-muted">{cat.description || '-'}</td>
                   <td className="cms-td-actions">
+                    <button className="cms-action-btn" title={t('Edit', 'Editar')} onClick={() => { setEditingCategory(cat); setCategoryForm({ name: cat.name, description: cat.description || '' }); setShowNewCategory(false); }}>✏️</button>
                     <button className="cms-action-btn" title={t('Delete', 'Eliminar')} onClick={() => handleDeleteCategory(cat._id)}>🗑️</button>
                   </td>
                 </tr>
@@ -613,17 +625,22 @@ export function CMS() {
     <div className="cms-tab-content">
       <div className="cms-tab-header">
         <h2>{t('Tags', 'Etiquetas')}</h2>
+        <button className="btn-primary btn-sm" onClick={() => { setEditingTag(null); setNewTagName(''); setNewTagColor(''); }}>+ {t('New', 'Nuevo')}</button>
       </div>
 
       <div className="cms-card cms-card-form">
-        <h4>{t('New Tag', 'Nueva Etiqueta')}</h4>
+        <h4>{editingTag ? t('Edit Tag', 'Editar Etiqueta') : t('New Tag', 'Nueva Etiqueta')}</h4>
         <div className="cms-form">
           <div className="form-row">
             <div className="form-group">
               <input type="text" value={newTagName} onChange={e => setNewTagName(e.target.value)} placeholder={t('Tag name', 'Nombre de etiqueta')} />
             </div>
+            <div className="form-group" style={{ maxWidth: 100 }}>
+              <input type="color" value={newTagColor || '#6B7280'} onChange={e => setNewTagColor(e.target.value)} title={t('Color', 'Color')} />
+            </div>
             <div className="form-group" style={{ flex: 'none' }}>
-              <button className="btn-submit" onClick={handleCreateTag} disabled={!newTagName.trim()}>+ {t('Add', 'Añadir')}</button>
+              <button className="btn-submit" onClick={() => { if (editingTag) { handleDeleteTag(editingTag._id); } setEditingTag(null); setNewTagName(''); setNewTagColor(''); }} style={{ display: editingTag ? 'inline-block' : 'none' }}>{t('Cancel', 'Cancelar')}</button>
+              <button className="btn-submit" onClick={handleCreateTag} disabled={!newTagName.trim()}>{editingTag ? t('Save', 'Guardar') : '+ ' + t('Add', 'Añadir')}</button>
             </div>
           </div>
         </div>
@@ -645,7 +662,8 @@ export function CMS() {
                 <tr key={tag._id}>
                   <td><span className="cms-tag-badge" style={{ background: tag.color || '#E5E7EB', color: tag.color ? '#fff' : '#333' }}>{tag.name}</span></td>
                   <td className="cms-td-actions">
-                    <button className="cms-action-btn" title={t('Delete', 'Eliminar')} onClick={() => handleDeleteTag(tag._id)}>🗗</button>
+                    <button className="cms-action-btn" title={t('Edit', 'Editar')} onClick={() => { setEditingTag(tag); setNewTagName(tag.name); setNewTagColor(tag.color || ''); }}>✏️</button>
+                    <button className="cms-action-btn" title={t('Delete', 'Eliminar')} onClick={() => handleDeleteTag(tag._id)}>🗑️</button>
                   </td>
                 </tr>
               ))}

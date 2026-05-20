@@ -42,6 +42,7 @@ import {
   deleteCategory,
   getAllTags,
   createTag,
+  updateTag,
   deleteTag,
   getAllContentPages,
   getContentPage,
@@ -1358,6 +1359,14 @@ fastify.get('/qa/export',
     async (request: FastifyRequest<{ Body: { name: string; color?: string } }>, reply: FastifyReply) => {
       const tag = await createTag(request.body);
       return reply.code(201).send(tag);
+    }
+  );
+
+  fastify.put<{ Params: { id: string }; Body: { name?: string; color?: string } }>(
+    '/cms/tags/:id',
+    { preHandler: [verifyToken, requireRole('admin', 'manager', 'sme')] },
+    async (request) => {
+      return updateTag(request.params.id, request.body);
     }
   );
 

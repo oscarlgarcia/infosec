@@ -38,6 +38,10 @@ export async function createTag(data: { name: string; color?: string }) {
   return Tag.create(data);
 }
 
+export async function updateTag(id: string, data: Partial<{ name: string; color: string }>) {
+  return Tag.findByIdAndUpdate(id, data, { new: true });
+}
+
 export async function deleteTag(id: string) {
   return Tag.findByIdAndDelete(id);
 }
