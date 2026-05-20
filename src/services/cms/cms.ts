@@ -76,6 +76,23 @@ export async function getContentPageBySlug(slug: string) {
   return page;
 }
 
+export async function getAllPublishedPages() {
+  return ContentPage.find({ status: 'published' })
+    .populate('categoryId', 'name slug')
+    .sort({ order: 1 })
+    .lean();
+}
+
+export async function reorderPages(updates: { _id: string; parentId: string | null; order: number }[]) {
+  const ops = updates.map(u => ({
+    updateOne: {
+      filter: { _id: u._id },
+      update: { $set: { parentId: u.parentId || null, order: u.order } },
+    }
+  }));
+  return ContentPage.bulkWrite(ops);
+}
+
 export async function createContentPage(data: {
   title: string;
   content: string;

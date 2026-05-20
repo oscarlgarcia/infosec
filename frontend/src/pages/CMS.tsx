@@ -1,5 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import { useLanguage } from '../i18n/LanguageContext';
 import { Layout } from '../components/Layout';
 import { useApi } from '../contexts/AuthContext';
@@ -80,6 +81,35 @@ export function CMS() {
   const [tags, setTags] = useState<string[]>([]);
   const [newTagName, setNewTagName] = useState('');
   const [categoryForm, setCategoryForm] = useState({ name: '', description: '' });
+  const [expandedTreeIds, setExpandedTreeIds] = useState<Set<string>>(new Set());
+
+  const pageTree = useMemo(() => {
+    const map = new Map<string, ContentPage[]>();
+    const roots: ContentPage[] = [];
+    pages.forEach(p => {
+      const pid = (p as any).parentId?._id || (p as any).parentId || null;
+      if (pid) {
+        if (!map.has(pid)) map.set(pid, []);
+        map.get(pid)!.push(p);
+      } else {
+        roots.push(p);
+      }
+    });
+    map.forEach(children => children.sort((a, b) => ((a as any).order || 0) - ((b as any).order || 0)));
+    roots.sort((a, b) => ((a as any).order || 0) - ((b as any).order || 0));
+    return { roots, map };
+  }, [pages]);
+
+  const getDepth = useCallback((pageId: string, cache = new Map<string, number>()): number => {
+    if (cache.has(pageId)) return cache.get(pageId)!;
+    const p = pages.find(x => x._id === pageId);
+    if (!p) return 0;
+    const pid = (p as any).parentId?._id || (p as any).parentId || null;
+    if (!pid) { cache.set(pageId, 0); return 0; }
+    const depth = getDepth(pid, cache) + 1;
+    cache.set(pageId, depth);
+    return depth;
+  }, [pages]);
 
   // ── Data fetching ──
   useEffect(() => { fetchCategories(); fetchPages(); }, [filter]);
@@ -213,6 +243,42 @@ export function CMS() {
     } catch (e) { console.error('bookmark', e); }
   };
 
+  const handleDragEnd = async (result: any) => {
+    if (!result.destination) return;
+    const draggedId = result.draggableId;
+    const destParentId = result.destination.droppableId === '__root__' ? null : result.destination.droppableId;
+    const destIndex = result.destination.index;
+
+    const siblings = destParentId
+      ? (pageTree.map.get(destParentId) || [])
+      : pageTree.roots;
+    const updates = siblings.map((p, i) => ({
+      _id: p._id, parentId: destParentId, order: i === destIndex ? Date.now() : ((p as any).order || 0)
+    }));
+    const movedPage = updates.find(u => u._id === draggedId);
+    if (movedPage) movedPage.order = Date.now();
+
+    try {
+      await apiFetch('/cms/pages/reorder', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updates }),
+      });
+      fetchPages();
+    } catch (e) { console.error('reorder', e); }
+  };
+
+  const handleMoveToParent = async (pageId: string, newParentId: string) => {
+    try {
+      await apiFetch(`/cms/pages/${pageId}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ parentId: newParentId || null }),
+      });
+      fetchPages();
+      const r = await apiFetch(`/cms/pages/${pageId}`);
+      if (r.ok) setSelectedPage(await r.json());
+    } catch (e) { console.error('moveTo', e); }
+  };
+
   const handleCreateCategory = async () => {
     try {
       await apiFetch('/cms/categories', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(categoryForm) });
@@ -281,6 +347,37 @@ export function CMS() {
     </div>
   );
 
+  // ── Tree helpers ──
+  const renderTreeNodes = (nodes: ContentPage[], depth = 0): JSX.Element[] => {
+    return nodes.flatMap((node, idx) => {
+      const children = pageTree.map.get(node._id) || [];
+      const hasChildren = children.length > 0;
+      const isExpanded = expandedTreeIds.has(node._id);
+      return [
+        <Draggable key={node._id} draggableId={node._id} index={idx}>
+          {(provided, snapshot) => (
+            <div
+              ref={provided.innerRef}
+              {...provided.draggableProps}
+              {...provided.dragHandleProps}
+              className={`cms-tree-node${snapshot.isDragging ? ' dragging' : ''}${selectedPage?._id === node._id ? ' active' : ''}`}
+              style={{ ...provided.draggableProps.style, paddingLeft: 12 + depth * 16 }}
+              onClick={() => viewPage(node)}
+            >
+              {hasChildren ? (
+                <span className="cms-tree-toggle" onClick={e => { e.stopPropagation(); const s = new Set(expandedTreeIds); if (isExpanded) s.delete(node._id); else s.add(node._id); setExpandedTreeIds(s); }}>
+                  {isExpanded ? '▼' : '▶'}
+                </span>
+              ) : <span className="cms-tree-toggle cms-tree-toggle-empty">•</span>}
+              <span className="cms-tree-title">{node.title}</span>
+            </div>
+          )}
+        </Draggable>,
+        ...(hasChildren && isExpanded ? renderTreeNodes(children, depth + 1) : []),
+      ];
+    });
+  };
+
   // ── Render Sidebar ──
   const renderSidebar = () => (
     <div className={`cms-sidebar${sidebarOpen ? '' : ' collapsed'}`}>
@@ -302,7 +399,20 @@ export function CMS() {
       </div>
 
       <div className="cms-sb-section">
-        <div className="cms-sb-section-title">{t('Quick Access', 'Acceso Rápido')}</div>
+        <div className="cms-sb-section-title">{t('Pages Tree', 'Árbol de Páginas')}</div>
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <Droppable droppableId="__root__" type="PAGE">
+            {(provided) => (
+              <div ref={provided.innerRef} {...provided.droppableProps}>
+                {renderTreeNodes(pageTree.roots)}
+                {provided.placeholder}
+              </div>
+            )}
+          </Droppable>
+        </DragDropContext>
+      </div>
+
+      <div className="cms-sb-section" style={{ borderTop: '1px solid var(--gray-200)' }}>
         <div className="cms-sb-item" onClick={() => { fetchBookmarks(); setActiveTab('pages'); }}>
           ⭐ {t('Bookmarks', 'Favoritos')} <span className="cms-sb-count">{bookmarks.length}</span>
         </div>
@@ -399,10 +509,11 @@ export function CMS() {
               <tbody>
                 {displayedPages.map(page => {
                   const isBm = bookmarks.some(b => b.contentId?._id === page._id);
+                  const depth = getDepth(page._id);
                   return (
                     <tr key={page._id} className={`cms-tr${selectedPage?._id === page._id ? ' active' : ''}`}>
-                      <td className="cms-td-title" onClick={() => viewPage(page)}>
-                        <span className="cms-page-title">{page.title}</span>
+                      <td className="cms-td-title" onClick={() => viewPage(page)} style={{ paddingLeft: 16 + depth * 20 }}>
+                        <span className="cms-page-title">{depth > 0 && '└ '.repeat(depth)}{page.title}</span>
                         {page.summary && <span className="cms-page-summary">{page.summary}</span>}
                       </td>
                       <td>
@@ -417,6 +528,9 @@ export function CMS() {
                       <td>{page.viewCount}</td>
                       <td className="cms-td-date">{new Date(page.updatedAt).toLocaleDateString()}</td>
                       <td className="cms-td-actions" onClick={e => e.stopPropagation()}>
+                        {page.status === 'published' && (
+                          <a href={`/site/${page.slug}`} target="_blank" rel="noopener noreferrer" className="cms-action-btn" title={t('View public page', 'Ver página pública')}>🔗</a>
+                        )}
                         <button className="cms-action-btn" title={t('Edit', 'Editar')} onClick={() => navigate(`/cms/pages/edit/${page._id}`)}>✏️</button>
                         <button className="cms-action-btn" title={t('Duplicate', 'Duplicar')} onClick={() => handleDuplicatePage(page)}>📋</button>
                         <button className="cms-action-btn" title={isBm ? t('Remove bookmark', 'Quitar favorito') : t('Bookmark', 'Favorito')} onClick={() => handleToggleBookmark(page._id)}>{isBm ? '⭐' : '☆'}</button>
@@ -504,9 +618,23 @@ export function CMS() {
             <button className="btn-secondary btn-sm" onClick={() => { setShowVersions(!showVersions); if (!showVersions) fetchVersions(selectedPage._id); }}>
               🕐 {t('Versions', 'Versiones')}
             </button>
+            <div className="cms-move-to-group">
+              <label>{t('Move to:', 'Mover a:')}</label>
+              <select value={(selectedPage as any).parentId?._id || (selectedPage as any).parentId || ''} onChange={e => handleMoveToParent(selectedPage._id, e.target.value)} className="cms-move-select">
+                <option value="">— {t('Root', 'Raíz')} —</option>
+                {pages.filter(p => p._id !== selectedPage._id).map(p => (
+                  <option key={p._id} value={p._id}>{'— '.repeat(getDepth(p._id))}{p.title}</option>
+                ))}
+              </select>
+            </div>
             <button className="btn-secondary btn-sm" onClick={() => setShowPreview(true)}>
               👁 {t('Preview', 'Previsualizar')}
             </button>
+            {selectedPage.status === 'published' && (
+              <a href={`/site/${selectedPage.slug}`} target="_blank" rel="noopener noreferrer" className="btn-secondary btn-sm">
+                🔗 {t('View public', 'Ver pública')}
+              </a>
+            )}
             <button className="btn-delete btn-sm" onClick={() => handleDeletePage(selectedPage._id)}>🗑️</button>
           </div>
         </div>

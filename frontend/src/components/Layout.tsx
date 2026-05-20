@@ -98,6 +98,7 @@ export function Layout({ children, sidebarContent }: LayoutProps) {
       links.push({ path: '/gap-finder', label: 'Gap Finder', icon: NAV_ICONS.gapFinder });
       links.push({ path: '/orchestrator', label: 'Orchestrator', icon: NAV_ICONS.orchestrator });
       links.push({ path: '/cms', label: 'Content', icon: NAV_ICONS.cms });
+      links.push({ path: '/site', label: 'Site', icon: <svg viewBox="0 0 20 20" fill="currentColor" width={20} height={20}><path fillRule="evenodd" d="M4.083 9h1.946c.089-1.546.383-2.97.837-4.118A6.004 6.004 0 004.083 9zM10 2a8 8 0 100 16 8 8 0 000-16zm0 2c-.076 0-.232.032-.43.22-.247.237-.528.657-.783 1.278-.237.577-.445 1.31-.605 2.167h3.636c-.16-.857-.368-1.59-.605-2.167-.255-.621-.536-1.04-.783-1.278C10.232 4.032 10.076 4 10 4zm-3 7a1 1 0 100-2 1 1 0 000 2zm6 0a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd"/></svg> });
       links.push({ path: '/contradictions', label: 'Contradictions', icon: NAV_ICONS.contradictions });
     }
 

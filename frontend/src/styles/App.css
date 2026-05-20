@@ -7003,7 +7003,6 @@ body {
 }
 
 .site-article {
-  max-width: 900px;
   margin: 0 auto;
   background: white;
   border-radius: 12px;
@@ -7291,6 +7290,242 @@ body {
   font-size: 14px;
   color: var(--gray-500);
   margin-bottom: 20px;
+}
+
+/* ── CMS Editor Shell (full page) ── */
+.cms-editor-shell {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--gray-100);
+}
+
+.cms-editor-shell .cms-editor-topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--gray-200);
+  background: white;
+  flex-shrink: 0;
+}
+
+.cms-editor-shell .cms-editor-topbar h2 {
+  flex: 1;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--gray-900);
+  margin: 0;
+}
+
+.cms-editor-shell .cms-editor-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cms-editor-shell .cms-editor-form {
+  flex: 1;
+  overflow-y: auto;
+  padding: 32px 24px;
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.cms-editor-shell .cms-editor-preview {
+  flex: 1;
+  overflow-y: auto;
+  padding: 32px 24px;
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.cms-editor-shell .cms-editor-loading {
+  padding: 80px;
+  text-align: center;
+  color: var(--gray-500);
+}
+
+/* ── CMS Tree Nodes ── */
+.cms-tree-node {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  cursor: grab;
+  font-size: 13px;
+  color: var(--gray-700);
+  border-radius: 4px;
+  transition: background 0.15s;
+  user-select: none;
+}
+
+.cms-tree-node:hover {
+  background: var(--gray-200);
+}
+
+.cms-tree-node.active {
+  background: var(--primary);
+  color: white;
+}
+
+.cms-tree-node.dragging {
+  background: #dbeafe;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+}
+
+.cms-tree-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  font-size: 10px;
+  flex-shrink: 0;
+  cursor: pointer;
+  color: var(--gray-500);
+}
+
+.cms-tree-toggle:hover {
+  color: var(--gray-800);
+}
+
+.cms-tree-toggle-empty {
+  cursor: default;
+  color: var(--gray-400);
+}
+
+.cms-tree-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+/* ── CMS Move To ── */
+.cms-move-to-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--gray-600);
+}
+
+.cms-move-to-group label {
+  white-space: nowrap;
+}
+
+.cms-move-select {
+  padding: 4px 8px;
+  border: 1px solid var(--gray-300);
+  border-radius: 4px;
+  font-size: 12px;
+  background: white;
+  max-width: 160px;
+}
+
+/* ── Site Index (public tree view) ── */
+.site-index {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #f9fafb;
+}
+
+.site-index-body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.site-index-sidebar {
+  width: 260px;
+  background: white;
+  border-right: 1px solid var(--gray-200);
+  overflow-y: auto;
+  flex-shrink: 0;
+  padding: 12px 0;
+}
+
+.site-index-sidebar-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--gray-500);
+  padding: 8px 16px 12px;
+}
+
+.site-index-main {
+  flex: 1;
+  overflow-y: auto;
+  padding: 40px 32px;
+}
+
+.site-index-empty {
+  text-align: center;
+  padding: 80px 24px;
+  color: var(--gray-500);
+}
+
+.site-index-empty h2 {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--gray-700);
+  margin: 0 0 8px;
+}
+
+/* ── Site Tree Nodes (public) ── */
+.site-tree-node {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--gray-700);
+  transition: background 0.15s;
+}
+
+.site-tree-node:hover {
+  background: var(--gray-100);
+}
+
+.site-tree-node.active {
+  background: var(--primary);
+  color: white;
+}
+
+.site-tree-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  font-size: 10px;
+  flex-shrink: 0;
+  cursor: pointer;
+  color: var(--gray-500);
+}
+
+.site-tree-toggle:hover {
+  color: var(--gray-800);
+}
+
+.site-tree-toggle-empty {
+  cursor: default;
+  color: var(--gray-400);
+}
+
+.site-tree-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
 }
 
 

@@ -10,7 +10,7 @@ import { AskKnowledgeBase } from './pages/AskKnowledgeBase'
 import { Settings } from './pages/Settings'
 import { CMS } from './pages/CMS'
 import { CMSEditor } from './pages/CMSEditor'
-import { SitePage } from './pages/SitePage'
+import { SiteIndex } from './pages/SiteIndex'
 import { LoginPage } from './pages/Login'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { UserHome } from './pages/UserHome'
@@ -288,7 +288,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
                 </ProtectedRoute>
               }
             />
-            <Route path="/site/:slug" element={<SitePage />} />
+            <Route path="/site" element={<SiteIndex />} />
+            <Route path="/site/:slug" element={<SiteIndex />} />
           </Routes>
         </BrowserRouter>
       </ChatProvider>

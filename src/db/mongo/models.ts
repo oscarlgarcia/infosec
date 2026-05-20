@@ -149,6 +149,8 @@ export const ContentPageSchema = new Schema({
   content: { type: String, default: '' },
   summary: { type: String },
   categoryId: { type: Schema.Types.ObjectId, ref: 'Category' },
+  parentId: { type: Schema.Types.ObjectId, ref: 'ContentPage', default: null },
+  order: { type: Number, default: 0 },
   tags: [{ type: String }],
   status: { 
     type: String, 

@@ -62,7 +62,9 @@ import {
   updateFAQ,
   deleteFAQ,
   getFeaturedContent,
-  getPopularContent
+  getPopularContent,
+  reorderPages,
+  getAllPublishedPages
 } from '../services/cms/cms';
 import { 
   createClient, 
@@ -1397,6 +1399,11 @@ fastify.get('/qa/export',
     }
   );
 
+  // Public — list all published pages (for tree)
+  fastify.get('/cms/public/pages', async () => {
+    return getAllPublishedPages();
+  });
+
   // Public endpoint — no auth, only published pages
   fastify.get<{ Params: { slug: string } }>(
     '/cms/public/pages/:slug',
@@ -1432,6 +1439,16 @@ fastify.get('/qa/export',
     async (request, reply) => {
       await deleteContentPage(request.params.id);
       return reply.code(204).send();
+    }
+  );
+
+  // CMS — Reorder pages (batch update parentId/order)
+  fastify.put<{ Body: { updates: { _id: string; parentId: string | null; order: number }[] } }>(
+    '/cms/pages/reorder',
+    { preHandler: [verifyToken, requireRole('admin', 'manager', 'sme')] },
+    async (request) => {
+      await reorderPages(request.body.updates);
+      return { ok: true };
     }
   );
 

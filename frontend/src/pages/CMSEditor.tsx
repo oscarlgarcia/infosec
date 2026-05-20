@@ -1,7 +1,6 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../i18n/LanguageContext';
-import { Layout } from '../components/Layout';
 import { useApi } from '../contexts/AuthContext';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -164,6 +163,7 @@ export function CMSEditor() {
   const isNew = !id || id === 'new';
 
   const [categories, setCategories] = useState<Category[]>([]);
+  const [pages, setPages] = useState<any[]>([]);
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -172,16 +172,22 @@ export function CMSEditor() {
   const autoSaveTimer = useRef<any>(null);
 
   const [formData, setFormData] = useState({
-    title: '', content: '', summary: '', categoryId: '',
+    title: '', content: '', summary: '', categoryId: '', parentId: '',
     tags: [] as string[], status: 'draft' as 'draft' | 'published' | 'archived'
   });
 
   useEffect(() => {
-    const fetchCategories = async () => {
-      try { const r = await apiFetch('/cms/categories'); if (r.ok) setCategories(await r.json()); }
-      catch (e) { console.error('fetchCategories', e); }
+    const fetchData = async () => {
+      try {
+        const [catR, pagesR] = await Promise.all([
+          apiFetch('/cms/categories'),
+          apiFetch('/cms/pages'),
+        ]);
+        if (catR.ok) setCategories(await catR.json());
+        if (pagesR.ok) setPages(await pagesR.json());
+      } catch (e) { console.error('fetchData', e); }
     };
-    fetchCategories();
+    fetchData();
   }, []);
 
   useEffect(() => {
@@ -196,6 +202,7 @@ export function CMSEditor() {
             content: page.content,
             summary: page.summary || '',
             categoryId: page.categoryId?._id || '',
+            parentId: (page as any).parentId?._id || (page as any).parentId || '',
             tags: page.tags,
             status: page.status,
           });
@@ -253,96 +260,101 @@ export function CMSEditor() {
 
   if (loading) {
     return (
-      <Layout>
+      <div className="cms-editor-shell">
         <div className="cms-editor-loading"><em>{t('Loading...', 'Cargando...')}</em></div>
-      </Layout>
+      </div>
     );
   }
 
   return (
-    <Layout>
-      <div className="cms-editor-page">
-        <div className="cms-editor-topbar">
-          <button className="btn-secondary btn-sm" onClick={() => navigate('/cms')}>
-            ← {t('Back to list', 'Volver al listado')}
+    <div className="cms-editor-shell">
+      <div className="cms-editor-topbar">
+        <button className="btn-secondary btn-sm" onClick={() => navigate('/cms')}>
+          ← {t('Back to list', 'Volver al listado')}
+        </button>
+        <h2>{isNew ? t('New Page', 'Nueva Página') : t('Edit Page', 'Editar Página')}</h2>
+        <div className="cms-editor-topbar-right">
+          {!isNew && (
+            <span className={`cms-autosave cms-autosave-${autoSaveStatus}`}>
+              {autoSaveStatus === 'saving' ? t('Saving...', 'Guardando...') : autoSaveStatus === 'saved' ? t('Saved', 'Guardado') : ''}
+            </span>
+          )}
+          <button className="btn-secondary btn-sm" onClick={() => setShowPreview(!showPreview)}>
+            {showPreview ? '✏️ ' + t('Edit', 'Editar') : '👁 ' + t('Preview', 'Vista previa')}
           </button>
-          <h2>{isNew ? t('New Page', 'Nueva Página') : t('Edit Page', 'Editar Página')}</h2>
-          <div className="cms-editor-topbar-right">
-            {!isNew && (
-              <span className={`cms-autosave cms-autosave-${autoSaveStatus}`}>
-                {autoSaveStatus === 'saving' ? t('Saving...', 'Guardando...') : autoSaveStatus === 'saved' ? t('Saved', 'Guardado') : ''}
-              </span>
-            )}
-            <button className="btn-secondary btn-sm" onClick={() => setShowPreview(!showPreview)}>
-              {showPreview ? '✏️ ' + t('Edit', 'Editar') : '👁 ' + t('Preview', 'Vista previa')}
-            </button>
-            <button className="btn-primary btn-sm" onClick={handleSave} disabled={saving}>
-              {saving ? t('Saving...', 'Guardando...') : isNew ? t('Create', 'Crear') : t('Save', 'Guardar')}
-            </button>
+          <button className="btn-primary btn-sm" onClick={handleSave} disabled={saving}>
+            {saving ? t('Saving...', 'Guardando...') : isNew ? t('Create', 'Crear') : t('Save', 'Guardar')}
+          </button>
+        </div>
+      </div>
+
+      {error && <div className="cms-error" style={{ margin: '0 24px' }}>{error}</div>}
+
+      {showPreview ? (
+        <div className="cms-editor-preview">
+          <h1 className="cms-preview-title">{formData.title || t('(Untitled)', '(Sin título)')}</h1>
+          {formData.summary && <p className="cms-preview-summary">{formData.summary}</p>}
+          <div className="cms-view-content" dangerouslySetInnerHTML={{ __html: formData.content || '<p><em>' + t('No content', 'Sin contenido') + '</em></p>' }} />
+        </div>
+      ) : (
+        <div className="cms-editor-form">
+          <div className="form-group">
+            <label>{t('Title', 'Título')}</label>
+            <input type="text" value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} />
+          </div>
+          <div className="form-group">
+            <label>{t('Summary', 'Resumen')}</label>
+            <textarea value={formData.summary} onChange={e => setFormData({ ...formData, summary: e.target.value })} rows={2} />
+          </div>
+          <div className="form-group">
+            <label>{t('Content', 'Contenido')}</label>
+            <RichTextEditor content={formData.content} onChange={c => setFormData({ ...formData, content: c })} />
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label>{t('Category', 'Categoría')}</label>
+              <select value={formData.categoryId} onChange={e => setFormData({ ...formData, categoryId: e.target.value })}>
+                <option value="">{t('No category', 'Sin categoría')}</option>
+                {categories.map(cat => <option key={cat._id} value={cat._id}>{cat.name}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>{t('Status', 'Estado')}</label>
+              <select value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value as any })}>
+                <option value="draft">{t('Draft', 'Borrador')}</option>
+                <option value="published">{t('Published', 'Publicado')}</option>
+                <option value="archived">{t('Archived', 'Archivado')}</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label>{t('Parent page', 'Página padre')}</label>
+              <select value={formData.parentId} onChange={e => setFormData({ ...formData, parentId: e.target.value })}>
+                <option value="">— {t('Root', 'Raíz')} —</option>
+                {pages.map(p => <option key={p._id} value={p._id}>{p.title}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="form-group">
+            <label>{t('Tags', 'Etiquetas')}</label>
+            <div className="cms-tags-input">
+              {formData.tags.map((tag, i) => (
+                <span key={i} className="cms-tag-badge">
+                  {tag}
+                  <button type="button" className="cms-tag-rm" onClick={() => setFormData({ ...formData, tags: formData.tags.filter((_, j) => j !== i) })}>✕</button>
+                </span>
+              ))}
+              <input type="text" placeholder={t('Add tag...', 'Añadir etiqueta...')} className="cms-tag-add-input"
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && (e.target as HTMLInputElement).value.trim()) {
+                    setFormData({ ...formData, tags: [...formData.tags, (e.target as HTMLInputElement).value.trim()] });
+                    (e.target as HTMLInputElement).value = '';
+                  }
+                }}
+              />
+            </div>
           </div>
         </div>
-
-        {error && <div className="cms-error">{error}</div>}
-
-        {showPreview ? (
-          <div className="cms-editor-preview">
-            <h1 className="cms-preview-title">{formData.title || t('(Untitled)', '(Sin título)')}</h1>
-            {formData.summary && <p className="cms-preview-summary">{formData.summary}</p>}
-            <div className="cms-view-content" dangerouslySetInnerHTML={{ __html: formData.content || '<p><em>' + t('No content', 'Sin contenido') + '</em></p>' }} />
-          </div>
-        ) : (
-          <div className="cms-editor-form">
-            <div className="form-group">
-              <label>{t('Title', 'Título')}</label>
-              <input type="text" value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} />
-            </div>
-            <div className="form-group">
-              <label>{t('Summary', 'Resumen')}</label>
-              <textarea value={formData.summary} onChange={e => setFormData({ ...formData, summary: e.target.value })} rows={2} />
-            </div>
-            <div className="form-group">
-              <label>{t('Content', 'Contenido')}</label>
-              <RichTextEditor content={formData.content} onChange={c => setFormData({ ...formData, content: c })} />
-            </div>
-            <div className="form-row">
-              <div className="form-group">
-                <label>{t('Category', 'Categoría')}</label>
-                <select value={formData.categoryId} onChange={e => setFormData({ ...formData, categoryId: e.target.value })}>
-                  <option value="">{t('No category', 'Sin categoría')}</option>
-                  {categories.map(cat => <option key={cat._id} value={cat._id}>{cat.name}</option>)}
-                </select>
-              </div>
-              <div className="form-group">
-                <label>{t('Status', 'Estado')}</label>
-                <select value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value as any })}>
-                  <option value="draft">{t('Draft', 'Borrador')}</option>
-                  <option value="published">{t('Published', 'Publicado')}</option>
-                  <option value="archived">{t('Archived', 'Archivado')}</option>
-                </select>
-              </div>
-            </div>
-            <div className="form-group">
-              <label>{t('Tags', 'Etiquetas')}</label>
-              <div className="cms-tags-input">
-                {formData.tags.map((tag, i) => (
-                  <span key={i} className="cms-tag-badge">
-                    {tag}
-                    <button type="button" className="cms-tag-rm" onClick={() => setFormData({ ...formData, tags: formData.tags.filter((_, j) => j !== i) })}>✕</button>
-                  </span>
-                ))}
-                <input type="text" placeholder={t('Add tag...', 'Añadir etiqueta...')} className="cms-tag-add-input"
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' && (e.target as HTMLInputElement).value.trim()) {
-                      setFormData({ ...formData, tags: [...formData.tags, (e.target as HTMLInputElement).value.trim()] });
-                      (e.target as HTMLInputElement).value = '';
-                    }
-                  }}
-                />
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </Layout>
+      )}
+    </div>
   );
 }
