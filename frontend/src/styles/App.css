@@ -7430,7 +7430,7 @@ body {
 
 /* ── Site Index (public tree view) ── */
 .site-index {
-  min-height: 100vh;
+  height: 100%;
   display: flex;
   flex-direction: column;
   background: #f9fafb;
