@@ -9,6 +9,8 @@ import { Home } from './pages/Home'
 import { AskKnowledgeBase } from './pages/AskKnowledgeBase'
 import { Settings } from './pages/Settings'
 import { CMS } from './pages/CMS'
+import { CMSEditor } from './pages/CMSEditor'
+import { SitePage } from './pages/SitePage'
 import { LoginPage } from './pages/Login'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { UserHome } from './pages/UserHome'
@@ -91,6 +93,22 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
               element={
                 <ProtectedRoute>
                   <CMS />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/cms/pages/new"
+              element={
+                <ProtectedRoute>
+                  <CMSEditor />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/cms/pages/edit/:id"
+              element={
+                <ProtectedRoute>
+                  <CMSEditor />
                 </ProtectedRoute>
               }
             />
@@ -270,6 +288,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
                 </ProtectedRoute>
               }
             />
+            <Route path="/site/:slug" element={<SitePage />} />
           </Routes>
         </BrowserRouter>
       </ChatProvider>

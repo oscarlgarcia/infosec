@@ -1397,6 +1397,18 @@ fastify.get('/qa/export',
     }
   );
 
+  // Public endpoint — no auth, only published pages
+  fastify.get<{ Params: { slug: string } }>(
+    '/cms/public/pages/:slug',
+    async (request: FastifyRequest<{ Params: { slug: string } }>, reply: FastifyReply) => {
+      const page = await getContentPageBySlug(request.params.slug);
+      if (!page || page.status !== 'published') {
+        return reply.code(404).send({ error: 'Page not found' });
+      }
+      return page;
+    }
+  );
+
   fastify.post<{ Body: { title: string; content: string; summary?: string; categoryId?: string; tags?: string[]; status?: 'draft' | 'published' | 'archived'; authorId?: string } }>(
     '/cms/pages',
     { preHandler: [verifyToken, requireRole('admin', 'manager', 'sme')] },

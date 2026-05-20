@@ -1,22 +1,8 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../i18n/LanguageContext';
 import { Layout } from '../components/Layout';
 import { useApi } from '../contexts/AuthContext';
-import { useEditor, EditorContent } from '@tiptap/react';
-import StarterKit from '@tiptap/starter-kit';
-import Underline from '@tiptap/extension-underline';
-import Link from '@tiptap/extension-link';
-import TextAlign from '@tiptap/extension-text-align';
-import Subscript from '@tiptap/extension-subscript';
-import Superscript from '@tiptap/extension-superscript';
-import { TextStyle } from '@tiptap/extension-text-style';
-import { Color } from '@tiptap/extension-color';
-import { Table } from '@tiptap/extension-table';
-import { TableRow } from '@tiptap/extension-table-row';
-import { TableCell } from '@tiptap/extension-table-cell';
-import { TableHeader } from '@tiptap/extension-table-header';
-import { Image as ImageExt } from '@tiptap/extension-image';
-import { Placeholder } from '@tiptap/extension-placeholder';
 
 interface Category {
   _id: string;
@@ -63,127 +49,8 @@ type Tab = 'pages' | 'categories' | 'tags';
 
 const PAGE_SIZE = 20;
 
-function RichTextEditor({ content, onChange }: { content: string; onChange: (c: string) => void }) {
-  const [linkUrl, setLinkUrl] = useState('');
-  const [showLinkInput, setShowLinkInput] = useState(false);
-  const [showImageInput, setShowImageInput] = useState(false);
-  const [imageUrl, setImageUrl] = useState('');
-
-  const editor = useEditor({
-    extensions: [
-      StarterKit.configure({ codeBlock: { HTMLAttributes: { class: 'code-block' } } }),
-      Underline,
-      Link.configure({ openOnClick: false }),
-      TextAlign.configure({ types: ['heading', 'paragraph'] }),
-      Subscript,
-      Superscript,
-      TextStyle,
-      Color,
-      Table.configure({ resizable: true }),
-      TableRow,
-      TableCell,
-      TableHeader,
-      ImageExt,
-      Placeholder.configure({ placeholder: 'Escribe aquí el contenido...' }),
-    ],
-    content,
-    onUpdate: ({ editor }) => onChange(editor.getHTML()),
-  });
-
-  if (!editor) return <div className="cms-editor-loading"><em>Cargando editor...</em></div>;
-
-  const setLink = () => {
-    if (linkUrl) editor.chain().focus().extendMarkRange('link').setLink({ href: linkUrl }).run();
-    else editor.chain().focus().unsetLink().run();
-    setLinkUrl('');
-    setShowLinkInput(false);
-  };
-
-  const addImage = () => {
-    if (imageUrl) {
-      editor.chain().focus().setImage({ src: imageUrl }).run();
-      setImageUrl('');
-      setShowImageInput(false);
-    }
-  };
-
-  const addTable = () => {
-    editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
-  };
-
-  const ToolBtn = ({ onClick, active, title, children }: any) => (
-    <button type="button" onClick={onClick} className={`cms-tb-btn${active ? ' active' : ''}`} title={title}>
-      {children}
-    </button>
-  );
-
-  const Sep = () => <span className="cms-tb-sep" />;
-
-  return (
-    <div className="cms-rteditor">
-      <div className="cms-toolbar">
-        <ToolBtn onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')} title="Bold"><strong>B</strong></ToolBtn>
-        <ToolBtn onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive('italic')} title="Italic"><em>I</em></ToolBtn>
-        <ToolBtn onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive('underline')} title="Underline"><u>U</u></ToolBtn>
-        <ToolBtn onClick={() => editor.chain().focus().toggleStrike().run()} active={editor.isActive('strike')} title="Strikethrough"><s>S</s></ToolBtn>
-        <ToolBtn onClick={() => editor.chain().focus().toggleCode().run()} active={editor.isActive('code')} title="Code">{'</>'}</ToolBtn>
-        <Sep />
-        <ToolBtn onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} active={editor.isActive('heading', { level: 1 })} title="Heading 1">H1</ToolBtn>
-        <ToolBtn onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editor.isActive('heading', { level: 2 })} title="Heading 2">H2</ToolBtn>
-        <ToolBtn onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} active={editor.isActive('heading', { level: 3 })} title="Heading 3">H3</ToolBtn>
-        <ToolBtn onClick={() => editor.chain().focus().setParagraph().run()} active={editor.isActive('paragraph')} title="Paragraph">P</ToolBtn>
-        <Sep />
-        <ToolBtn onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive('bulletList')} title="Bullet list">≡</ToolBtn>
-        <ToolBtn onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive('orderedList')} title="Ordered list">1.</ToolBtn>
-        <ToolBtn onClick={() => editor.chain().focus().sinkListItem('listItem').run()} title="Indent">→</ToolBtn>
-        <ToolBtn onClick={() => editor.chain().focus().liftListItem('listItem').run()} title="Outdent">←</ToolBtn>
-        <Sep />
-        <ToolBtn onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive('blockquote')} title="Blockquote">"</ToolBtn>
-        <ToolBtn onClick={() => editor.chain().focus().toggleCodeBlock().run()} active={editor.isActive('codeBlock')} title="Code block">{'{ }'}</ToolBtn>
-        <ToolBtn onClick={() => editor.chain().focus().setHorizontalRule().run()} title="Horizontal rule">—</ToolBtn>
-        <Sep />
-        <ToolBtn onClick={() => editor.chain().focus().setTextAlign('left').run()} active={editor.isActive({ textAlign: 'left' })} title="Align left">⬅</ToolBtn>
-        <ToolBtn onClick={() => editor.chain().focus().setTextAlign('center').run()} active={editor.isActive({ textAlign: 'center' })} title="Center">⬌</ToolBtn>
-        <ToolBtn onClick={() => editor.chain().focus().setTextAlign('right').run()} active={editor.isActive({ textAlign: 'right' })} title="Align right">➡</ToolBtn>
-        <ToolBtn onClick={() => editor.chain().focus().setTextAlign('justify').run()} active={editor.isActive({ textAlign: 'justify' })} title="Justify">≡</ToolBtn>
-        <Sep />
-        <ToolBtn onClick={() => editor.chain().focus().toggleSubscript().run()} active={editor.isActive('subscript')} title="Subscript">X₂</ToolBtn>
-        <ToolBtn onClick={() => editor.chain().focus().toggleSuperscript().run()} active={editor.isActive('superscript')} title="Superscript">X²</ToolBtn>
-        <Sep />
-        <ToolBtn onClick={addTable} active={false} title="Insert table">⊞</ToolBtn>
-        <ToolBtn onClick={() => { setShowImageInput(true); setShowLinkInput(false); }} active={false} title="Insert image">🖼</ToolBtn>
-        <ToolBtn onClick={() => { setShowLinkInput(!showLinkInput); setShowImageInput(false); }} active={editor.isActive('link')} title="Link">🔗</ToolBtn>
-        <ToolBtn onClick={() => editor.chain().focus().unsetAllMarks().run()} title="Clear format">⌫</ToolBtn>
-        <Sep />
-        <ToolBtn onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()} title="Undo">↶</ToolBtn>
-        <ToolBtn onClick={() => editor.chain().focus().redo().run()} disabled={!editor.can().redo()} title="Redo">↷</ToolBtn>
-      </div>
-
-      {showLinkInput && (
-        <div className="cms-tb-inputbar">
-          <input type="url" placeholder="URL del enlace..." value={linkUrl} onChange={e => setLinkUrl(e.target.value)} onKeyDown={e => e.key === 'Enter' && setLink()} />
-          <button type="button" onClick={setLink}>✓</button>
-          <button type="button" onClick={() => { setLinkUrl(''); setShowLinkInput(false); }}>✕</button>
-        </div>
-      )}
-      {showImageInput && (
-        <div className="cms-tb-inputbar">
-          <input type="url" placeholder="URL de la imagen..." value={imageUrl} onChange={e => setImageUrl(e.target.value)} onKeyDown={e => e.key === 'Enter' && addImage()} />
-          <button type="button" onClick={addImage}>✓</button>
-          <button type="button" onClick={() => { setImageUrl(''); setShowImageInput(false); }}>✕</button>
-        </div>
-      )}
-
-      <EditorContent editor={editor} className="cms-editor-content" />
-      <div className="cms-editor-footer">
-        <span>{editor.storage.characterCount?.characters?.() ?? editor.getText().length} chars</span>
-        <span>{editor.storage.characterCount?.words?.() ?? editor.getText().split(/\s+/).filter(Boolean).length} words</span>
-      </div>
-    </div>
-  );
-}
-
 export function CMS() {
+  const navigate = useNavigate();
   const { language } = useLanguage();
   const t = (es: string, en: string) => language === 'es' ? es : en;
   const apiFetch = useApi();
@@ -197,8 +64,6 @@ export function CMS() {
   const [versions, setVersions] = useState<ContentVersion[]>([]);
 
   const [selectedPage, setSelectedPage] = useState<ContentPage | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
-  const [showNewPage, setShowNewPage] = useState(false);
   const [showNewCategory, setShowNewCategory] = useState(false);
   const [showVersions, setShowVersions] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
@@ -209,20 +74,11 @@ export function CMS() {
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [pageNum, setPageNum] = useState(1);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const autoSaveTimer = useRef<any>(null);
   const [tags, setTags] = useState<string[]>([]);
   const [newTagName, setNewTagName] = useState('');
-
-  const [formData, setFormData] = useState({
-    title: '', content: '', summary: '', categoryId: '',
-    tags: [] as string[], status: 'draft' as 'draft' | 'published' | 'archived'
-  });
-
   const [categoryForm, setCategoryForm] = useState({ name: '', description: '' });
 
   // ── Data fetching ──
@@ -302,24 +158,6 @@ export function CMS() {
   const totalPages = Math.ceil(filteredPages.length / PAGE_SIZE);
   const displayedPages = filteredPages.length > 30 ? filteredPages.slice((pageNum - 1) * PAGE_SIZE, pageNum * PAGE_SIZE) : filteredPages;
 
-  // ── Auto-save ──
-  useEffect(() => {
-    if (!isEditing || !selectedPage) return;
-    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-    autoSaveTimer.current = setTimeout(async () => {
-      setAutoSaveStatus('saving');
-      try {
-        await apiFetch(`/cms/pages/${selectedPage._id}`, {
-          method: 'PUT', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData),
-        });
-        setAutoSaveStatus('saved');
-        setTimeout(() => setAutoSaveStatus('idle'), 2000);
-      } catch { setAutoSaveStatus('idle'); }
-    }, 30000);
-    return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current); };
-  }, [formData, isEditing, selectedPage]);
-
   // ── Handlers ──
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
@@ -332,36 +170,6 @@ export function CMS() {
       })));
     } catch (e) { console.error('search', e); }
     finally { setIsSearching(false); }
-  };
-
-  const handleCreatePage = async () => {
-    setIsSaving(true);
-    try {
-      await apiFetch('/cms/pages', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
-      setShowNewPage(false);
-      setFormData({ title: '', content: '', summary: '', categoryId: '', tags: [], status: 'draft' });
-      fetchPages();
-    } catch (e) { console.error('createPage', e); }
-    finally { setIsSaving(false); }
-  };
-
-  const handleUpdatePage = async () => {
-    if (!selectedPage) return;
-    setIsSaving(true);
-    try {
-      await apiFetch(`/cms/pages/${selectedPage._id}`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
-      setIsEditing(false);
-      fetchPages();
-      const r = await apiFetch(`/cms/pages/${selectedPage._id}`);
-      if (r.ok) setSelectedPage(await r.json());
-    } catch (e) { console.error('updatePage', e); }
-    finally { setIsSaving(false); }
   };
 
   const handleDeletePage = async (id: string) => {
@@ -432,13 +240,8 @@ export function CMS() {
     catch (e) { console.error('deleteTag', e); }
   };
 
-  const openEdit = (page: ContentPage) => {
-    setFormData({ title: page.title, content: page.content, summary: page.summary || '', categoryId: page.categoryId?._id || '', tags: page.tags, status: page.status });
-    setIsEditing(true); setShowPreview(false); setShowVersions(false);
-  };
-
   const viewPage = (page: ContentPage) => {
-    setSelectedPage(page); setIsEditing(false); setShowNewPage(false); setShowPreview(false); setShowVersions(false);
+    setSelectedPage(page); setShowPreview(false); setShowVersions(false);
     fetchBookmarks(); fetchRecent();
   };
 
@@ -537,9 +340,9 @@ export function CMS() {
               <option value="archived">{t('Archived', 'Archivado')}</option>
             </select>
           </div>
-          <button className="btn-primary" onClick={() => { setShowNewPage(true); setSelectedPage(null); }}>
-            + {t('New', 'Nuevo')}
-          </button>
+            <button className="btn-primary" onClick={() => navigate('/cms/pages/new')}>
+              + {t('New', 'Nuevo')}
+            </button>
         </div>
 
         <div className="cms-vector-bar">
@@ -614,7 +417,7 @@ export function CMS() {
                       <td>{page.viewCount}</td>
                       <td className="cms-td-date">{new Date(page.updatedAt).toLocaleDateString()}</td>
                       <td className="cms-td-actions" onClick={e => e.stopPropagation()}>
-                        <button className="cms-action-btn" title={t('Edit', 'Editar')} onClick={() => { viewPage(page); openEdit(page); }}>✏️</button>
+                        <button className="cms-action-btn" title={t('Edit', 'Editar')} onClick={() => navigate(`/cms/pages/edit/${page._id}`)}>✏️</button>
                         <button className="cms-action-btn" title={t('Duplicate', 'Duplicar')} onClick={() => handleDuplicatePage(page)}>📋</button>
                         <button className="cms-action-btn" title={isBm ? t('Remove bookmark', 'Quitar favorito') : t('Bookmark', 'Favorito')} onClick={() => handleToggleBookmark(page._id)}>{isBm ? '⭐' : '☆'}</button>
                         <button className="cms-action-btn" title={t('Delete', 'Eliminar')} onClick={() => handleDeletePage(page._id)}>🗑️</button>
@@ -638,45 +441,15 @@ export function CMS() {
     </div>
   );
 
-  // ── Render Editor / View ──
+  // ── Render View / Preview ──
   const renderMainContent = () => {
-    if (showNewPage) {
-      return (
-        <div className="cms-editor-panel">
-          <div className="cms-editor-header">
-            <h3>{t('New Page', 'Nueva Página')}</h3>
-          </div>
-          {renderEditorForm(false)}
-        </div>
-      );
-    }
-
     if (!selectedPage) {
       return (
         <div className="cms-empty-view">
           <div className="cms-empty-icon">📄</div>
           <h3>{t('Select a page', 'Selecciona una página')}</h3>
           <p>{t('Choose a page from the list or create a new one', 'Elige una página de la lista o crea una nueva')}</p>
-          <button className="btn-primary" onClick={() => { setShowNewPage(true); }}>+ {t('New Page', 'Nueva Página')}</button>
-        </div>
-      );
-    }
-
-    if (isEditing) {
-      return (
-        <div className="cms-editor-panel">
-          <div className="cms-editor-header">
-            <h3>{t('Edit Page', 'Editar Página')} — {selectedPage.title}</h3>
-            <div className="cms-editor-header-right">
-              <span className={`cms-autosave cms-autosave-${autoSaveStatus}`}>
-                {autoSaveStatus === 'saving' ? t('Saving...', 'Guardando...') : autoSaveStatus === 'saved' ? t('Saved', 'Guardado') : ''}
-              </span>
-              <button className="btn-secondary btn-sm" onClick={() => { setShowPreview(true); setIsEditing(false); }}>
-                👁 {t('Preview', 'Vista previa')}
-              </button>
-            </div>
-          </div>
-          {renderEditorForm(true)}
+          <button className="btn-primary" onClick={() => navigate('/cms/pages/new')}>+ {t('New Page', 'Nueva Página')}</button>
         </div>
       );
     }
@@ -687,16 +460,15 @@ export function CMS() {
           <div className="cms-view-header">
             <h1>{selectedPage.title}</h1>
             <div className="cms-view-actions">
-              <button className="btn-primary btn-sm" onClick={() => openEdit(selectedPage)}>✏️ {t('Edit', 'Editar')}</button>
+              <button className="btn-primary btn-sm" onClick={() => navigate(`/cms/pages/edit/${selectedPage._id}`)}>✏️ {t('Edit', 'Editar')}</button>
               <button className="btn-secondary btn-sm" onClick={() => setShowPreview(false)}>← {t('View', 'Ver')}</button>
             </div>
           </div>
-          <div className="cms-view-content" dangerouslySetInnerHTML={{ __html: formData.content || '<p><em>Sin contenido</em></p>' }} />
+          <div className="cms-view-content" dangerouslySetInnerHTML={{ __html: selectedPage.content || '<p><em>Sin contenido</em></p>' }} />
         </div>
       );
     }
 
-    // View mode
     return (
       <div className="cms-view">
         <div className="cms-view-header">
@@ -728,11 +500,11 @@ export function CMS() {
                 <button className="btn-sm" onClick={() => setShowVersions(false)}>{t('Close', 'Cerrar')}</button>
               </div>
             )}
-            <button className="btn-primary btn-sm" onClick={() => openEdit(selectedPage)}>✏️ {t('Edit', 'Editar')}</button>
+            <button className="btn-primary btn-sm" onClick={() => navigate(`/cms/pages/edit/${selectedPage._id}`)}>✏️ {t('Edit', 'Editar')}</button>
             <button className="btn-secondary btn-sm" onClick={() => { setShowVersions(!showVersions); if (!showVersions) fetchVersions(selectedPage._id); }}>
               🕐 {t('Versions', 'Versiones')}
             </button>
-            <button className="btn-secondary btn-sm" onClick={() => { setShowPreview(true); setFormData({ title: selectedPage.title, content: selectedPage.content, summary: selectedPage.summary || '', categoryId: selectedPage.categoryId?._id || '', tags: selectedPage.tags, status: selectedPage.status }); }}>
+            <button className="btn-secondary btn-sm" onClick={() => setShowPreview(true)}>
               👁 {t('Preview', 'Previsualizar')}
             </button>
             <button className="btn-delete btn-sm" onClick={() => handleDeletePage(selectedPage._id)}>🗑️</button>
@@ -756,67 +528,6 @@ export function CMS() {
       </div>
     );
   };
-
-  const renderEditorForm = (isEdit: boolean) => (
-    <div className="cms-form">
-      <div className="form-group">
-        <label>{t('Title', 'Título')}</label>
-        <input type="text" value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} />
-      </div>
-      <div className="form-group">
-        <label>{t('Summary', 'Resumen')}</label>
-        <textarea value={formData.summary} onChange={e => setFormData({ ...formData, summary: e.target.value })} rows={2} />
-      </div>
-      <div className="form-group">
-        <label>{t('Content', 'Contenido')}</label>
-        <RichTextEditor content={formData.content} onChange={c => setFormData({ ...formData, content: c })} />
-      </div>
-      <div className="form-row">
-        <div className="form-group">
-          <label>{t('Category', 'Categoría')}</label>
-          <select value={formData.categoryId} onChange={e => setFormData({ ...formData, categoryId: e.target.value })}>
-            <option value="">{t('No category', 'Sin categoría')}</option>
-            {categories.map(cat => <option key={cat._id} value={cat._id}>{cat.name}</option>)}
-          </select>
-        </div>
-        <div className="form-group">
-          <label>{t('Status', 'Estado')}</label>
-          <select value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value as any })}>
-            <option value="draft">{t('Draft', 'Borrador')}</option>
-            <option value="published">{t('Published', 'Publicado')}</option>
-            <option value="archived">{t('Archived', 'Archivado')}</option>
-          </select>
-        </div>
-      </div>
-      <div className="form-group">
-        <label>{t('Tags', 'Etiquetas')}</label>
-        <div className="cms-tags-input">
-          {formData.tags.map((tag, i) => (
-            <span key={i} className="cms-tag-badge">
-              {tag}
-              <button type="button" className="cms-tag-rm" onClick={() => setFormData({ ...formData, tags: formData.tags.filter((_, j) => j !== i) })}>✕</button>
-            </span>
-          ))}
-          <input type="text" placeholder={t('Add tag...', 'Añadir etiqueta...')} className="cms-tag-add-input"
-            onKeyDown={e => {
-              if (e.key === 'Enter' && (e.target as HTMLInputElement).value.trim()) {
-                setFormData({ ...formData, tags: [...formData.tags, (e.target as HTMLInputElement).value.trim()] });
-                (e.target as HTMLInputElement).value = '';
-              }
-            }}
-          />
-        </div>
-      </div>
-      <div className="form-actions">
-        <button className="btn-cancel" onClick={() => { setIsEditing(false); setShowNewPage(false); }}>
-          {t('Cancel', 'Cancelar')}
-        </button>
-        <button className="btn-submit" onClick={isEdit ? handleUpdatePage : handleCreatePage} disabled={isSaving}>
-          {isSaving ? t('Saving...', 'Guardando...') : isEdit ? t('Save', 'Guardar') : t('Create', 'Crear')}
-        </button>
-      </div>
-    </div>
-  );
 
   // ── Render Categories Tab ──
   const renderCategoriesTab = () => (
@@ -950,7 +661,7 @@ export function CMS() {
         {activeTab === 'pages' && (
           <div className="cms-content-area">
             {renderPagesTab()}
-            {(selectedPage || showNewPage) && (
+            {selectedPage && (
               <div className="cms-content-detail">
                 {renderMainContent()}
               </div>
