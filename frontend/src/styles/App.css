@@ -1627,6 +1627,7 @@ body {
 /* CMS Styles */
 .cms-container {
   display: flex;
+  flex-direction: column;
   height: 100%;
   overflow: hidden;
   min-height: 0;
@@ -1639,6 +1640,8 @@ body {
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .cms-header {
@@ -1740,6 +1743,9 @@ body {
   flex: 1;
   overflow-y: auto;
   background: white;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .cms-empty-view {
@@ -3446,11 +3452,12 @@ body {
   overflow-y: auto;
   background: white;
   min-width: 0;
+  border-left: 1px solid var(--gray-200);
 }
 
 .cms-pages-layout {
   display: flex;
-  flex: 1;
+  flex: 2;
   overflow: hidden;
   min-height: 0;
 }
@@ -4128,8 +4135,11 @@ body {
 
 /* ── CMS Card & Tabs ── */
 .cms-tab-content {
+  flex: 1;
+  overflow-y: auto;
   padding: 24px;
   max-width: 900px;
+  width: 100%;
 }
 
 .cms-tab-header {

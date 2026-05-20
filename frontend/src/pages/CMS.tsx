@@ -950,9 +950,11 @@ export function CMS() {
         {activeTab === 'pages' && (
           <div className="cms-content-area">
             {renderPagesTab()}
-            <div className="cms-content-detail">
-              {renderMainContent()}
-            </div>
+            {(selectedPage || showNewPage) && (
+              <div className="cms-content-detail">
+                {renderMainContent()}
+              </div>
+            )}
           </div>
         )}
 
