@@ -64,7 +64,8 @@ import {
   getFeaturedContent,
   getPopularContent,
   reorderPages,
-  getAllPublishedPages
+  getAllPublishedPages,
+  checkSlugExists
 } from '../services/cms/cms';
 import { 
   createClient, 
@@ -1425,7 +1426,7 @@ fastify.get('/qa/export',
     }
   );
 
-  fastify.put<{ Params: { id: string }; Body: { title?: string; content?: string; summary?: string; categoryId?: string; tags?: string[]; status?: 'draft' | 'published' | 'archived'; relatedContent?: string[]; isFeatured?: boolean } }>(
+  fastify.put<{ Params: { id: string }; Body: { title?: string; content?: string; summary?: string; categoryId?: string; slug?: string; tags?: string[]; status?: 'draft' | 'published' | 'archived'; relatedContent?: string[]; isFeatured?: boolean } }>(
     '/cms/pages/:id',
     { preHandler: [verifyToken, requireRole('admin', 'manager', 'sme')] },
     async (request) => {
@@ -1439,6 +1440,16 @@ fastify.get('/qa/export',
     async (request, reply) => {
       await deleteContentPage(request.params.id);
       return reply.code(204).send();
+    }
+  );
+
+  // CMS — Check slug availability
+  fastify.get<{ Querystring: { slug: string; excludeId?: string } }>(
+    '/cms/pages/check-slug',
+    { preHandler: [verifyToken, requireRole('admin', 'manager', 'sme')] },
+    async (request) => {
+      const exists = await checkSlugExists(request.query.slug, request.query.excludeId);
+      return { available: !exists };
     }
   );
 

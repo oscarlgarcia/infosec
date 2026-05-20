@@ -129,12 +129,20 @@ export async function createContentPage(data: {
   return page;
 }
 
+export async function checkSlugExists(slug: string, excludeId?: string): Promise<boolean> {
+  const q: any = { slug: slug.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') };
+  if (excludeId) q._id = { $ne: excludeId };
+  const existing = await ContentPage.findOne(q).select('_id').lean();
+  return !!existing;
+}
+
 export async function updateContentPage(id: string, data: Partial<{
   title: string;
   content: string;
   summary: string;
   categoryId: string;
   parentId: string;
+  slug: string;
   tags: string[];
   status: 'draft' | 'published' | 'archived';
   relatedContent: string[];
@@ -152,6 +160,14 @@ export async function updateContentPage(id: string, data: Partial<{
       ? (data.parentId.trim() ? data.parentId.trim() : undefined)
       : data.parentId,
   };
+
+  if (data.slug !== undefined) {
+    const slugValue = data.slug.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    if (slugValue !== page.slug && await checkSlugExists(slugValue, id)) {
+      throw new Error(`Slug "${slugValue}" is already in use`);
+    }
+    updateData.slug = slugValue;
+  }
   
   if (data.content && data.content !== page.content) {
     const newVersion = {

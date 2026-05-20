@@ -7528,4 +7528,41 @@ body {
   flex: 1;
 }
 
+.site-index-back-link {
+  display: block;
+  padding: 6px 16px 12px;
+  font-size: 12px;
+  color: var(--secondary);
+  text-decoration: none;
+}
+.site-index-back-link:hover {
+  text-decoration: underline;
+}
+
+/* ── CMS Slug Validation ── */
+.cms-slug-input {
+  font-family: monospace;
+  font-size: 13px;
+}
+.cms-slug-taken { border-color: #EF4444 !important; }
+.cms-slug-ok { border-color: #22C55E !important; }
+.cms-slug-status { font-weight: 400; font-size: 12px; }
+.cms-slug-status.checking { color: var(--gray-500); }
+.cms-slug-status.available { color: #22C55E; }
+.cms-slug-status.taken { color: #EF4444; }
+
+/* ── CMS Inline Move To ── */
+.cms-move-inline {
+  font-size: 11px;
+  padding: 2px 4px;
+  border: 1px solid var(--gray-300);
+  border-radius: 4px;
+  max-width: 32px;
+  cursor: pointer;
+  background: white;
+}
+.cms-move-inline:hover {
+  border-color: var(--secondary);
+}
+
 

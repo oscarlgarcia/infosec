@@ -1,5 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useLanguage } from '../i18n/LanguageContext';
+import { useAuth } from '../contexts/AuthContext';
+import boardLogo from '../assets/images/Board_logo_RGB.svg';
 
 interface PageData {
   _id: string;
@@ -34,6 +37,15 @@ export function SiteIndex() {
       .catch(() => setLoading(false));
   }, [slug]);
 
+  const { language } = useLanguage();
+  const { user, isAuthenticated, logout } = useAuth();
+
+  useEffect(() => {
+    if (!loading && page) {
+      document.title = (slug && slug !== 'index' ? page?.title : 'Home') + ' | InfoSec';
+    }
+  }, [loading, page, slug]);
+
   const tree = useMemo(() => {
     const map = new Map<string, PageData[]>();
     const roots: PageData[] = [];
@@ -54,6 +66,10 @@ export function SiteIndex() {
 
   const renderTree = (nodes: PageData[], depth = 0): JSX.Element[] => {
     return nodes.flatMap(node => {
+      if (node.slug === 'index') {
+        const children = tree.map.get(node._id) || [];
+        return renderTree(children, depth);
+      }
       const children = tree.map.get(node._id) || [];
       const hasChildren = children.length > 0;
       const isExpanded = expandedIds.has(node._id);
@@ -84,23 +100,57 @@ export function SiteIndex() {
     );
   }
 
+  const isIndex = !slug || slug === 'index';
+
+  const handleLogout = async () => { await logout(); };
+
   return (
     <div className="site-index">
-      <header className="site-header">
-        <div className="site-header-inner">
-          <a href="/site" className="site-logo">InfoSec</a>
-          <span className="site-header-title">{page?.title || 'Pages'}</span>
+      <header className="layout-header">
+        <img src={boardLogo} alt="Board" className="layout-header-logo" />
+        <div className="header-search">
+          <input
+            type="text"
+            className="search-input"
+            placeholder={language === 'es' ? 'Buscar...' : 'Search...'}
+          />
+        </div>
+        <div className="header-auth-section">
+          {isAuthenticated && user ? (
+            <>
+              {(user.role === 'admin' || user.role === 'manager' || user.role === 'sme') && (
+                <Link to="/cms" className="btn-primary btn-sm" style={{ textDecoration: 'none' }}>CMS</Link>
+              )}
+              <span className="user-greeting">
+                {language === 'es' ? 'Hola,' : 'Hi,'} <strong>{user.username}</strong>
+              </span>
+              <span className={`role-indicator role-${user.role}`}>
+                {user.role === 'admin' && 'Admin'}
+                {user.role === 'manager' && 'Manager'}
+                {user.role === 'sme' && 'SME'}
+                {user.role === 'usuario' && (language === 'es' ? 'Usuario' : 'User')}
+              </span>
+              <button className="btn-logout-header" onClick={handleLogout}>
+                {language === 'es' ? 'Cerrar sesion' : 'Logout'}
+              </button>
+            </>
+          ) : (
+            <Link to="/login" className="btn-login-header">
+              {language === 'es' ? 'Iniciar sesion' : 'Login'}
+            </Link>
+          )}
         </div>
       </header>
       <div className="site-index-body">
         <aside className="site-index-sidebar">
           <div className="site-index-sidebar-title">Pages</div>
+          <a href="/app" className="site-index-back-link">← Back to Home</a>
           {renderTree(tree.roots)}
         </aside>
         <main className="site-index-main">
           {page ? (
             <article className="site-article">
-              <h1 className="site-title">{page.title}</h1>
+              <h1 className="site-title">{isIndex ? 'Home' : page.title}</h1>
               {page.summary && <p className="site-summary">{page.summary}</p>}
               {page.tags.length > 0 && (
                 <div className="site-meta">

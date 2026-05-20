@@ -26,6 +26,7 @@ interface Category {
 interface ContentPage {
   _id: string;
   title: string;
+  slug: string;
   content: string;
   summary?: string;
   categoryId?: Category;
@@ -169,10 +170,12 @@ export function CMSEditor() {
   const [error, setError] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
+  const slugTimer = useRef<any>(null);
   const autoSaveTimer = useRef<any>(null);
 
   const [formData, setFormData] = useState({
-    title: '', content: '', summary: '', categoryId: '', parentId: '',
+    title: '', content: '', summary: '', slug: '', categoryId: '', parentId: '',
     tags: [] as string[], status: 'draft' as 'draft' | 'published' | 'archived'
   });
 
@@ -201,6 +204,7 @@ export function CMSEditor() {
             title: page.title,
             content: page.content,
             summary: page.summary || '',
+            slug: page.slug,
             categoryId: page.categoryId?._id || '',
             parentId: (page as any).parentId?._id || (page as any).parentId || '',
             tags: page.tags,
@@ -217,6 +221,34 @@ export function CMSEditor() {
     };
     fetchPage();
   }, [id]);
+
+  // Auto-generate slug from title
+  useEffect(() => {
+    if (isNew || !formData.slug) {
+      const generated = formData.title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+      if (generated && generated !== formData.slug) {
+        setFormData(prev => ({ ...prev, slug: generated }));
+      }
+    }
+  }, [formData.title]);
+
+  // Debounced slug availability check
+  useEffect(() => {
+    if (slugTimer.current) clearTimeout(slugTimer.current);
+    if (!formData.slug) { setSlugStatus('idle'); return; }
+    if (isNew && !formData.slug) return;
+    slugTimer.current = setTimeout(async () => {
+      setSlugStatus('checking');
+      try {
+        const r = await apiFetch(`/cms/pages/check-slug?slug=${encodeURIComponent(formData.slug)}${id ? `&excludeId=${id}` : ''}`);
+        if (r.ok) {
+          const data = await r.json();
+          setSlugStatus(data.available ? 'available' : 'taken');
+        }
+      } catch { setSlugStatus('idle'); }
+    }, 500);
+    return () => { if (slugTimer.current) clearTimeout(slugTimer.current); };
+  }, [formData.slug, id]);
 
   useEffect(() => {
     if (isNew) return;
@@ -238,24 +270,34 @@ export function CMSEditor() {
   const handleSave = async () => {
     setSaving(true);
     try {
+      const body = { ...formData };
       if (isNew) {
+        const { slug, ...rest } = body;
         await apiFetch('/cms/pages', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData),
+          body: JSON.stringify(rest),
         });
       } else {
         await apiFetch(`/cms/pages/${id}`, {
           method: 'PUT', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData),
+          body: JSON.stringify(body),
         });
       }
       navigate('/cms');
-    } catch (e) {
+    } catch (e: any) {
       console.error('save', e);
-      setError(t('Error saving page', 'Error al guardar la página'));
+      setError(e.message || t('Error saving page', 'Error al guardar la página'));
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleDelete = async () => {
+    if (!confirm(t('Delete this page?', '¿Eliminar esta página?'))) return;
+    try {
+      await apiFetch(`/cms/pages/${id}`, { method: 'DELETE' });
+      navigate('/cms');
+    } catch (e) { console.error('delete', e); }
   };
 
   if (loading) {
@@ -282,9 +324,17 @@ export function CMSEditor() {
           <button className="btn-secondary btn-sm" onClick={() => setShowPreview(!showPreview)}>
             {showPreview ? '✏️ ' + t('Edit', 'Editar') : '👁 ' + t('Preview', 'Vista previa')}
           </button>
+          {!isNew && formData.status === 'published' && (
+            <a href={`/site/${formData.slug}`} target="_blank" rel="noopener noreferrer" className="btn-secondary btn-sm" style={{ textDecoration: 'none' }}>
+              🔗 {t('View public', 'Ver pública')}
+            </a>
+          )}
           <button className="btn-primary btn-sm" onClick={handleSave} disabled={saving}>
             {saving ? t('Saving...', 'Guardando...') : isNew ? t('Create', 'Crear') : t('Save', 'Guardar')}
           </button>
+          {!isNew && (
+            <button className="btn-delete btn-sm" onClick={handleDelete}>🗑️</button>
+          )}
         </div>
       </div>
 
@@ -301,6 +351,15 @@ export function CMSEditor() {
           <div className="form-group">
             <label>{t('Title', 'Título')}</label>
             <input type="text" value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} />
+          </div>
+          <div className="form-group">
+            <label>
+              {t('Slug', 'Slug')}
+              {slugStatus === 'checking' && <span className="cms-slug-status checking"> ⏳</span>}
+              {slugStatus === 'available' && <span className="cms-slug-status available"> ✅</span>}
+              {slugStatus === 'taken' && <span className="cms-slug-status taken"> ❌ {t('Already in use', 'Ya en uso')}</span>}
+            </label>
+            <input type="text" value={formData.slug} onChange={e => setFormData({ ...formData, slug: e.target.value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') })} className={`cms-slug-input${slugStatus === 'taken' ? ' cms-slug-taken' : ''}${slugStatus === 'available' ? ' cms-slug-ok' : ''}`} />
           </div>
           <div className="form-group">
             <label>{t('Summary', 'Resumen')}</label>

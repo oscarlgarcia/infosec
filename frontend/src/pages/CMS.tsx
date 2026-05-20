@@ -39,13 +39,6 @@ interface RecentAccess {
   accessedAt: string;
 }
 
-interface ContentVersion {
-  version: number;
-  changedBy?: string;
-  changeNote?: string;
-  createdAt: string;
-}
-
 type Tab = 'pages' | 'categories' | 'tags';
 
 const PAGE_SIZE = 20;
@@ -62,12 +55,7 @@ export function CMS() {
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [recent, setRecent] = useState<RecentAccess[]>([]);
   const [searchResults, setSearchResults] = useState<ContentPage[]>([]);
-  const [versions, setVersions] = useState<ContentVersion[]>([]);
-
-  const [selectedPage, setSelectedPage] = useState<ContentPage | null>(null);
   const [showNewCategory, setShowNewCategory] = useState(false);
-  const [showVersions, setShowVersions] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
 
   const [filter, setFilter] = useState({ status: '', categoryId: '', search: '' });
   const [sortKey, setSortKey] = useState<string>('updatedAt');
@@ -148,11 +136,6 @@ export function CMS() {
     catch (e) { console.error('fetchRecent', e); }
   };
 
-  const fetchVersions = async (pageId: string) => {
-    try { const r = await apiFetch(`/cms/pages/${pageId}/versions`); if (r.ok) setVersions(await r.json()); }
-    catch (e) { console.error('fetchVersions', e); }
-  };
-
   // ── Stats ──
   const stats = useMemo(() => ({
     total: pages.length,
@@ -206,7 +189,7 @@ export function CMS() {
     if (!confirm(t('Delete page?', '¿Eliminar página?'))) return;
     try {
       await apiFetch(`/cms/pages/${id}`, { method: 'DELETE' });
-      setSelectedPage(null); fetchPages();
+      fetchPages();
     } catch (e) { console.error('deletePage', e); }
   };
 
@@ -227,10 +210,6 @@ export function CMS() {
         body: JSON.stringify({ status }),
       });
       fetchPages();
-      if (selectedPage?._id === id) {
-        const r = await apiFetch(`/cms/pages/${id}`);
-        if (r.ok) setSelectedPage(await r.json());
-      }
     } catch (e) { console.error('statusChange', e); }
   };
 
@@ -243,20 +222,43 @@ export function CMS() {
     } catch (e) { console.error('bookmark', e); }
   };
 
+  const handleMoveToParent = async (pageId: string, newParentId: string) => {
+    try {
+      await apiFetch(`/cms/pages/${pageId}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ parentId: newParentId || null }),
+      });
+      fetchPages();
+    } catch (e) { console.error('moveTo', e); }
+  };
+
   const handleDragEnd = async (result: any) => {
     if (!result.destination) return;
     const draggedId = result.draggableId;
+    const sourceParentId = result.source.droppableId === '__root__' ? null : result.source.droppableId;
     const destParentId = result.destination.droppableId === '__root__' ? null : result.destination.droppableId;
     const destIndex = result.destination.index;
 
-    const siblings = destParentId
-      ? (pageTree.map.get(destParentId) || [])
-      : pageTree.roots;
-    const updates = siblings.map((p, i) => ({
-      _id: p._id, parentId: destParentId, order: i === destIndex ? Date.now() : ((p as any).order || 0)
+    const destSiblings = destParentId
+      ? [...(pageTree.map.get(destParentId) || [])]
+      : [...pageTree.roots];
+
+    const existingIdx = destSiblings.findIndex(p => p._id === draggedId);
+    if (existingIdx !== -1) destSiblings.splice(existingIdx, 1);
+    destSiblings.splice(destIndex, 0, pages.find(p => p._id === draggedId)!);
+
+    const updates: any[] = destSiblings.map((p, i) => ({
+      _id: p._id, parentId: destParentId, order: i
     }));
-    const movedPage = updates.find(u => u._id === draggedId);
-    if (movedPage) movedPage.order = Date.now();
+
+    if (sourceParentId !== destParentId) {
+      const sourceSiblings = sourceParentId
+        ? (pageTree.map.get(sourceParentId) || [])
+        : pageTree.roots;
+      sourceSiblings.filter(p => p._id !== draggedId).forEach((p, i) => {
+        updates.push({ _id: p._id, parentId: sourceParentId, order: i });
+      });
+    }
 
     try {
       await apiFetch('/cms/pages/reorder', {
@@ -265,18 +267,6 @@ export function CMS() {
       });
       fetchPages();
     } catch (e) { console.error('reorder', e); }
-  };
-
-  const handleMoveToParent = async (pageId: string, newParentId: string) => {
-    try {
-      await apiFetch(`/cms/pages/${pageId}`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ parentId: newParentId || null }),
-      });
-      fetchPages();
-      const r = await apiFetch(`/cms/pages/${pageId}`);
-      if (r.ok) setSelectedPage(await r.json());
-    } catch (e) { console.error('moveTo', e); }
   };
 
   const handleCreateCategory = async () => {
@@ -304,11 +294,6 @@ export function CMS() {
     if (!confirm(t('Delete tag?', '¿Eliminar etiqueta?'))) return;
     try { await apiFetch(`/cms/tags/${id}`, { method: 'DELETE' }); fetchTags(); }
     catch (e) { console.error('deleteTag', e); }
-  };
-
-  const viewPage = (page: ContentPage) => {
-    setSelectedPage(page); setShowPreview(false); setShowVersions(false);
-    fetchBookmarks(); fetchRecent();
   };
 
   const toggleSort = (key: string) => {
@@ -360,9 +345,9 @@ export function CMS() {
               ref={provided.innerRef}
               {...provided.draggableProps}
               {...provided.dragHandleProps}
-              className={`cms-tree-node${snapshot.isDragging ? ' dragging' : ''}${selectedPage?._id === node._id ? ' active' : ''}`}
+               className={`cms-tree-node${snapshot.isDragging ? ' dragging' : ''}`}
               style={{ ...provided.draggableProps.style, paddingLeft: 12 + depth * 16 }}
-              onClick={() => viewPage(node)}
+              onClick={() => navigate(`/cms/pages/edit/${node._id}`)}
             >
               {hasChildren ? (
                 <span className="cms-tree-toggle" onClick={e => { e.stopPropagation(); const s = new Set(expandedTreeIds); if (isExpanded) s.delete(node._id); else s.add(node._id); setExpandedTreeIds(s); }}>
@@ -469,7 +454,7 @@ export function CMS() {
               <button className="btn-sm" onClick={() => setSearchResults([])}>✕</button>
             </div>
             {searchResults.map(r => (
-              <div key={r._id} className="cms-vector-item" onClick={() => viewPage(r)}>
+              <div key={r._id} className="cms-vector-item" onClick={() => navigate(`/cms/pages/edit/${r._id}`)}>
                 <div className="cms-item-title">{r.title}</div>
                 <div className="cms-item-meta">{r.content?.substring(0, 120)}...</div>
               </div>
@@ -511,8 +496,8 @@ export function CMS() {
                   const isBm = bookmarks.some(b => b.contentId?._id === page._id);
                   const depth = getDepth(page._id);
                   return (
-                    <tr key={page._id} className={`cms-tr${selectedPage?._id === page._id ? ' active' : ''}`}>
-                      <td className="cms-td-title" onClick={() => viewPage(page)} style={{ paddingLeft: 16 + depth * 20 }}>
+                    <tr key={page._id}>
+                      <td className="cms-td-title" onClick={() => navigate(`/cms/pages/edit/${page._id}`)} style={{ paddingLeft: 16 + depth * 20 }}>
                         <span className="cms-page-title">{depth > 0 && '└ '.repeat(depth)}{page.title}</span>
                         {page.summary && <span className="cms-page-summary">{page.summary}</span>}
                       </td>
@@ -534,6 +519,13 @@ export function CMS() {
                         <button className="cms-action-btn" title={t('Edit', 'Editar')} onClick={() => navigate(`/cms/pages/edit/${page._id}`)}>✏️</button>
                         <button className="cms-action-btn" title={t('Duplicate', 'Duplicar')} onClick={() => handleDuplicatePage(page)}>📋</button>
                         <button className="cms-action-btn" title={isBm ? t('Remove bookmark', 'Quitar favorito') : t('Bookmark', 'Favorito')} onClick={() => handleToggleBookmark(page._id)}>{isBm ? '⭐' : '☆'}</button>
+                        <select className="cms-move-inline" value="" onChange={e => { const v = e.target.value; if (v) { handleMoveToParent(page._id, v); } e.target.value = ''; }} title={t('Move to...', 'Mover a...')}>
+                          <option value="">↕</option>
+                          <option value="">— {t('Root', 'Raíz')} —</option>
+                          {pages.filter(p => p._id !== page._id).map(p => (
+                            <option key={p._id} value={p._id}>{'─ '.repeat(getDepth(p._id))}{p.title}</option>
+                          ))}
+                        </select>
                         <button className="cms-action-btn" title={t('Delete', 'Eliminar')} onClick={() => handleDeletePage(page._id)}>🗑️</button>
                       </td>
                     </tr>
@@ -555,107 +547,7 @@ export function CMS() {
     </div>
   );
 
-  // ── Render View / Preview ──
-  const renderMainContent = () => {
-    if (!selectedPage) {
-      return (
-        <div className="cms-empty-view">
-          <div className="cms-empty-icon">📄</div>
-          <h3>{t('Select a page', 'Selecciona una página')}</h3>
-          <p>{t('Choose a page from the list or create a new one', 'Elige una página de la lista o crea una nueva')}</p>
-          <button className="btn-primary" onClick={() => navigate('/cms/pages/new')}>+ {t('New Page', 'Nueva Página')}</button>
-        </div>
-      );
-    }
-
-    if (showPreview) {
-      return (
-        <div className="cms-view">
-          <div className="cms-view-header">
-            <h1>{selectedPage.title}</h1>
-            <div className="cms-view-actions">
-              <button className="btn-primary btn-sm" onClick={() => navigate(`/cms/pages/edit/${selectedPage._id}`)}>✏️ {t('Edit', 'Editar')}</button>
-              <button className="btn-secondary btn-sm" onClick={() => setShowPreview(false)}>← {t('View', 'Ver')}</button>
-            </div>
-          </div>
-          <div className="cms-view-content" dangerouslySetInnerHTML={{ __html: selectedPage.content || '<p><em>Sin contenido</em></p>' }} />
-        </div>
-      );
-    }
-
-    return (
-      <div className="cms-view">
-        <div className="cms-view-header">
-          <div>
-            <h1>{selectedPage.title}</h1>
-            <div className="cms-view-meta">
-              <span className="cms-status-badge" style={{ background: statusColor(selectedPage.status) }}>{statusLabel(selectedPage.status)}</span>
-              {selectedPage.categoryId && <span className="cms-view-cat">{selectedPage.categoryId.name}</span>}
-              <span className="cms-view-stat">👁 {selectedPage.viewCount}</span>
-              <span className="cms-view-stat">{new Date(selectedPage.updatedAt).toLocaleDateString()}</span>
-              <button className="cms-action-btn" onClick={() => handleToggleBookmark(selectedPage._id)}>
-                {bookmarks.some(b => b.contentId?._id === selectedPage._id) ? '⭐' : '☆'}
-              </button>
-            </div>
-          </div>
-          <div className="cms-view-actions">
-            {showVersions && (
-              <div className="cms-versions-panel">
-                <h4>{t('Version History', 'Historial de Versiones')}</h4>
-                {versions.length === 0 ? <p className="cms-empty">{t('No versions', 'Sin versiones')}</p> : (
-                  versions.map((v, i) => (
-                    <div key={i} className="cms-version-item">
-                      <strong>v{v.version}</strong>
-                      {v.changeNote && <span> — {v.changeNote}</span>}
-                      <span className="cms-date">{v.createdAt ? new Date(v.createdAt).toLocaleDateString() : ''}</span>
-                    </div>
-                  ))
-                )}
-                <button className="btn-sm" onClick={() => setShowVersions(false)}>{t('Close', 'Cerrar')}</button>
-              </div>
-            )}
-            <button className="btn-primary btn-sm" onClick={() => navigate(`/cms/pages/edit/${selectedPage._id}`)}>✏️ {t('Edit', 'Editar')}</button>
-            <button className="btn-secondary btn-sm" onClick={() => { setShowVersions(!showVersions); if (!showVersions) fetchVersions(selectedPage._id); }}>
-              🕐 {t('Versions', 'Versiones')}
-            </button>
-            <div className="cms-move-to-group">
-              <label>{t('Move to:', 'Mover a:')}</label>
-              <select value={(selectedPage as any).parentId?._id || (selectedPage as any).parentId || ''} onChange={e => handleMoveToParent(selectedPage._id, e.target.value)} className="cms-move-select">
-                <option value="">— {t('Root', 'Raíz')} —</option>
-                {pages.filter(p => p._id !== selectedPage._id).map(p => (
-                  <option key={p._id} value={p._id}>{'— '.repeat(getDepth(p._id))}{p.title}</option>
-                ))}
-              </select>
-            </div>
-            <button className="btn-secondary btn-sm" onClick={() => setShowPreview(true)}>
-              👁 {t('Preview', 'Previsualizar')}
-            </button>
-            {selectedPage.status === 'published' && (
-              <a href={`/site/${selectedPage.slug}`} target="_blank" rel="noopener noreferrer" className="btn-secondary btn-sm">
-                🔗 {t('View public', 'Ver pública')}
-              </a>
-            )}
-            <button className="btn-delete btn-sm" onClick={() => handleDeletePage(selectedPage._id)}>🗑️</button>
-          </div>
-        </div>
-
-        {selectedPage.summary && (
-          <div className="cms-view-summary">
-            <h4>{t('Summary', 'Resumen')}</h4>
-            <p>{selectedPage.summary}</p>
-          </div>
-        )}
-
-        <div className="cms-view-content" dangerouslySetInnerHTML={{ __html: selectedPage.content || '<p><em>Sin contenido</em></p>' }} />
-
-        {selectedPage.tags.length > 0 && (
-          <div className="cms-view-tags">
-            {selectedPage.tags.map((tag, i) => <span key={i} className="cms-tag-badge">{tag}</span>)}
-          </div>
-        )}
-      </div>
-    );
-  };
+  // Render View / Preview — removed, click navigates to editor
 
   // ── Render Categories Tab ──
   const renderCategoriesTab = () => (
@@ -786,16 +678,7 @@ export function CMS() {
 
         {activeTab === 'pages' && renderDashboard()}
 
-        {activeTab === 'pages' && (
-          <div className="cms-content-area">
-            {renderPagesTab()}
-            {selectedPage && (
-              <div className="cms-content-detail">
-                {renderMainContent()}
-              </div>
-            )}
-          </div>
-        )}
+        {activeTab === 'pages' && renderPagesTab()}
 
         {activeTab === 'categories' && renderCategoriesTab()}
         {activeTab === 'tags' && renderTagsTab()}
