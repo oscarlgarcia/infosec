@@ -15,6 +15,7 @@ export function ScheduleDetail() {
   const [snapshots, setSnapshots] = useState<any[]>([]);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [expandedSnapId, setExpandedSnapId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -145,6 +146,9 @@ export function ScheduleDetail() {
                         <span>{m.canonicalCount || 0} {t('canonical', 'canónicas')}</span>
                         <span>{m.avgConfidence || 0}% {t('conf.', 'conf.')}</span>
                       </div>
+                      <button className="btn-sm btn-secondary" onClick={() => setExpandedSnapId(expandedSnapId === snap._id ? null : snap._id)}>
+                        {expandedSnapId === snap._id ? t('Hide Report', 'Ocultar Reporte') : t('View Report', 'Ver Reporte')}
+                      </button>
                     </div>
                     {prevSnap && (
                       <div className="sd-snapshot-diff">
@@ -153,10 +157,61 @@ export function ScheduleDetail() {
                           if (!d) return null;
                           return (
                             <span key={f} className={`sd-diff-${d.up ? 'up' : 'down'}`}>
-                              {f}: {d.prev} → {d.curr}
+                              {t(f === 'totalSources' ? 'sources' : f === 'gapCount' ? 'gaps' : f === 'contradictionCount' ? 'contradictions' : f === 'canonicalCount' ? 'canonicals' : 'confidence', f)}: {d.prev} → {d.curr}
                             </span>
                           );
                         })}
+                      </div>
+                    )}
+                    {expandedSnapId === snap._id && snap.report && (
+                      <div className="sd-report">
+                        {snap.report.definition && (
+                          <div className="sd-report-section">
+                            <strong>{t('Definition', 'Definición')}:</strong>
+                            <p>{typeof snap.report.definition === 'string' ? snap.report.definition : JSON.stringify(snap.report.definition)}</p>
+                          </div>
+                        )}
+                        {snap.report.summary && (
+                          <div className="sd-report-section">
+                            <strong>{t('Summary', 'Resumen')}:</strong>
+                            <p>{snap.report.summary}</p>
+                          </div>
+                        )}
+                        {snap.report.directQA && (
+                          <div className="sd-report-section">
+                            <strong>QA:</strong>
+                            <p>{snap.report.directQA}</p>
+                          </div>
+                        )}
+                        {snap.report.sourcesUsed && snap.report.sourcesUsed.length > 0 && (
+                          <div className="sd-report-section">
+                            <strong>{t('Sources', 'Fuentes')} ({snap.report.sourcesUsed.length}):</strong>
+                            <ul>{snap.report.sourcesUsed.map((s: any, i: number) => <li key={i}>{s.title || s.url || s}</li>)}</ul>
+                          </div>
+                        )}
+                        {snap.report.coverageGaps && snap.report.coverageGaps.length > 0 && (
+                          <div className="sd-report-section">
+                            <strong>{t('Coverage Gaps', 'Gaps de Cobertura')} ({snap.report.coverageGaps.length}):</strong>
+                            <ul>{snap.report.coverageGaps.map((g: any, i: number) => <li key={i}>{g.question || g.description || JSON.stringify(g)}</li>)}</ul>
+                          </div>
+                        )}
+                        {snap.report.canonicalAnswers && snap.report.canonicalAnswers.length > 0 && (
+                          <div className="sd-report-section">
+                            <strong>{t('Canonical Answers', 'Respuestas Canónicas')} ({snap.report.canonicalAnswers.length}):</strong>
+                            {snap.report.canonicalAnswers.map((ca: any, i: number) => (
+                              <div key={i} className="sd-report-ca">
+                                <p><strong>Q:</strong> {ca.question || ''}</p>
+                                <p><strong>A:</strong> {ca.answer || ''}</p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {snap.report.relatedTopics && snap.report.relatedTopics.length > 0 && (
+                          <div className="sd-report-section">
+                            <strong>{t('Related Topics', 'Temas Relacionados')}:</strong>
+                            <p>{snap.report.relatedTopics.join(', ')}</p>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
