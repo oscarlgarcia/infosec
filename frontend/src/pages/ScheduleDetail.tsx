@@ -168,31 +168,31 @@ export function ScheduleDetail() {
                         {snap.report.definition && (
                           <div className="sd-report-section">
                             <strong>{t('Definition', 'Definición')}:</strong>
-                            <p>{typeof snap.report.definition === 'string' ? snap.report.definition : JSON.stringify(snap.report.definition)}</p>
+                            <p>{typeof snap.report.definition === 'string' ? snap.report.definition : JSON.stringify(snap.report.definition, null, 2)}</p>
                           </div>
                         )}
                         {snap.report.summary && (
                           <div className="sd-report-section">
                             <strong>{t('Summary', 'Resumen')}:</strong>
-                            <p>{snap.report.summary}</p>
+                            <p>{typeof snap.report.summary === 'string' ? snap.report.summary : JSON.stringify(snap.report.summary, null, 2)}</p>
                           </div>
                         )}
                         {snap.report.directQA && (
                           <div className="sd-report-section">
                             <strong>QA:</strong>
-                            <p>{snap.report.directQA}</p>
+                            <p>{typeof snap.report.directQA === 'string' ? snap.report.directQA : typeof snap.report.directQA === 'object' && snap.report.directQA.answer ? snap.report.directQA.answer : JSON.stringify(snap.report.directQA, null, 2)}</p>
                           </div>
                         )}
                         {snap.report.sourcesUsed && snap.report.sourcesUsed.length > 0 && (
                           <div className="sd-report-section">
                             <strong>{t('Sources', 'Fuentes')} ({snap.report.sourcesUsed.length}):</strong>
-                            <ul>{snap.report.sourcesUsed.map((s: any, i: number) => <li key={i}>{s.title || s.url || s}</li>)}</ul>
+                            <ul>{snap.report.sourcesUsed.map((s: any, i: number) => <li key={i}>{typeof s === 'string' ? s : s.title || s.url || s.name || JSON.stringify(s)}</li>)}</ul>
                           </div>
                         )}
                         {snap.report.coverageGaps && snap.report.coverageGaps.length > 0 && (
                           <div className="sd-report-section">
                             <strong>{t('Coverage Gaps', 'Gaps de Cobertura')} ({snap.report.coverageGaps.length}):</strong>
-                            <ul>{snap.report.coverageGaps.map((g: any, i: number) => <li key={i}>{g.question || g.description || JSON.stringify(g)}</li>)}</ul>
+                            <ul>{snap.report.coverageGaps.map((g: any, i: number) => <li key={i}>{typeof g === 'string' ? g : g.question || g.description || JSON.stringify(g)}</li>)}</ul>
                           </div>
                         )}
                         {snap.report.canonicalAnswers && snap.report.canonicalAnswers.length > 0 && (
@@ -201,7 +201,7 @@ export function ScheduleDetail() {
                             {snap.report.canonicalAnswers.map((ca: any, i: number) => (
                               <div key={i} className="sd-report-ca">
                                 <p><strong>Q:</strong> {ca.question || ''}</p>
-                                <p><strong>A:</strong> {ca.answer || ''}</p>
+                                <p><strong>A:</strong> {typeof ca.answer === 'string' ? ca.answer : JSON.stringify(ca.answer)}</p>
                               </div>
                             ))}
                           </div>
@@ -209,7 +209,7 @@ export function ScheduleDetail() {
                         {snap.report.relatedTopics && snap.report.relatedTopics.length > 0 && (
                           <div className="sd-report-section">
                             <strong>{t('Related Topics', 'Temas Relacionados')}:</strong>
-                            <p>{snap.report.relatedTopics.join(', ')}</p>
+                            <p>{snap.report.relatedTopics.map((rt: any) => typeof rt === 'string' ? rt : JSON.stringify(rt)).join(', ')}</p>
                           </div>
                         )}
                       </div>
