@@ -177,39 +177,45 @@ export function ScheduleDetail() {
                             <p>{typeof snap.report.summary === 'string' ? snap.report.summary : JSON.stringify(snap.report.summary, null, 2)}</p>
                           </div>
                         )}
-                        {snap.report.directQA && (
+                        {Array.isArray(snap.report.directQA) && snap.report.directQA.length > 0 && (
                           <div className="sd-report-section">
-                            <strong>QA:</strong>
-                            <p>{typeof snap.report.directQA === 'string' ? snap.report.directQA : typeof snap.report.directQA === 'object' && snap.report.directQA.answer ? snap.report.directQA.answer : JSON.stringify(snap.report.directQA, null, 2)}</p>
+                            <strong>{t('Direct Q&A', 'QA Directas')} ({snap.report.directQA.length}):</strong>
+                            {snap.report.directQA.map((qa: any, i: number) => (
+                              <div key={i} className="sd-report-ca">
+                                <p><strong>Q:</strong> {qa.question || ''}</p>
+                                <p><strong>A:</strong> {typeof qa.answer === 'string' ? qa.answer : JSON.stringify(qa.answer)}</p>
+                                <p className="sd-report-meta">{qa.sourceType} · {qa.score}% · {qa.isDirect ? 'direct' : 'related'}</p>
+                              </div>
+                            ))}
                           </div>
                         )}
-                        {snap.report.sourcesUsed && snap.report.sourcesUsed.length > 0 && (
+                        {Array.isArray(snap.report.sourcesUsed) && snap.report.sourcesUsed.length > 0 && (
                           <div className="sd-report-section">
                             <strong>{t('Sources', 'Fuentes')} ({snap.report.sourcesUsed.length}):</strong>
                             <ul>{snap.report.sourcesUsed.map((s: any, i: number) => <li key={i}>{typeof s === 'string' ? s : s.title || s.url || s.name || JSON.stringify(s)}</li>)}</ul>
                           </div>
                         )}
-                        {snap.report.coverageGaps && snap.report.coverageGaps.length > 0 && (
+                        {Array.isArray(snap.report.coverageGaps) && snap.report.coverageGaps.length > 0 && (
                           <div className="sd-report-section">
                             <strong>{t('Coverage Gaps', 'Gaps de Cobertura')} ({snap.report.coverageGaps.length}):</strong>
-                            <ul>{snap.report.coverageGaps.map((g: any, i: number) => <li key={i}>{typeof g === 'string' ? g : g.question || g.description || JSON.stringify(g)}</li>)}</ul>
+                            <ul>{snap.report.coverageGaps.map((g: any, i: number) => <li key={i}>{typeof g === 'string' ? g : g.topic || g.question || g.description || JSON.stringify(g)}</li>)}</ul>
                           </div>
                         )}
-                        {snap.report.canonicalAnswers && snap.report.canonicalAnswers.length > 0 && (
+                        {Array.isArray(snap.report.canonicalAnswers) && snap.report.canonicalAnswers.length > 0 && (
                           <div className="sd-report-section">
                             <strong>{t('Canonical Answers', 'Respuestas Canónicas')} ({snap.report.canonicalAnswers.length}):</strong>
                             {snap.report.canonicalAnswers.map((ca: any, i: number) => (
                               <div key={i} className="sd-report-ca">
                                 <p><strong>Q:</strong> {ca.question || ''}</p>
-                                <p><strong>A:</strong> {typeof ca.answer === 'string' ? ca.answer : JSON.stringify(ca.answer)}</p>
+                                <p><strong>A:</strong> {typeof ca.currentAnswer === 'string' ? ca.currentAnswer : typeof ca.answer === 'string' ? ca.answer : JSON.stringify(ca.currentAnswer || ca.answer)}</p>
                               </div>
                             ))}
                           </div>
                         )}
-                        {snap.report.relatedTopics && snap.report.relatedTopics.length > 0 && (
+                        {Array.isArray(snap.report.relatedTopics) && snap.report.relatedTopics.length > 0 && (
                           <div className="sd-report-section">
                             <strong>{t('Related Topics', 'Temas Relacionados')}:</strong>
-                            <p>{snap.report.relatedTopics.map((rt: any) => typeof rt === 'string' ? rt : JSON.stringify(rt)).join(', ')}</p>
+                            <p>{snap.report.relatedTopics.map((rt: any) => typeof rt === 'string' ? rt : rt.question || rt.title || JSON.stringify(rt)).join(', ')}</p>
                           </div>
                         )}
                       </div>

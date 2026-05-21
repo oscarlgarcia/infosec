@@ -6749,6 +6749,11 @@ body {
   margin: 2px 0;
 }
 
+.sd-report-meta {
+  font-size: 12px;
+  color: var(--gray-500);
+}
+
 /* Modal */
 .modal-overlay {
   position: fixed;
