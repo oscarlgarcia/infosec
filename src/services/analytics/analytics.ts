@@ -576,28 +576,37 @@ export async function getAnalyticsRequestMetrics(windowDays: number = 30) {
   const since = new Date(Date.now() - toMsDay(windowDays));
   const { ClientRequest } = await import('../../db/mongo/models');
 
-  const requests = await ClientRequest.find({ createdAt: { $gte: since } }).lean();
-  const completed = requests.filter(r => r.status === 'completed');
+  const requests = await ClientRequest.find({
+    createdAt: { $gte: since },
+    isDeleted: { $ne: true },
+  }).lean();
   const now = new Date();
+  const DONE_STATUSES = ['delivered', 'closed'];
+  const doneAt = (req: any) => req.deliveredAt || req.completedAt || req.closedAt || null;
+  const completed = requests.filter((r: any) =>
+    DONE_STATUSES.includes(r.status) || Boolean(doneAt(r))
+  );
+  const isOpen = (r: any) => !DONE_STATUSES.includes(r.status) && !doneAt(r);
 
-  // SLA compliance
+  // SLA compliance compares the derived resolution milestone against the
+  // SLA due date, never `updatedAt`.
   let slaMet = 0;
   let slaMissed = 0;
   for (const req of completed) {
-    if (req.deadline && req.updatedAt) {
-      const deadline = new Date(req.deadline);
-      const completedAt = new Date(req.updatedAt);
-      if (completedAt <= deadline) slaMet++;
-      else slaMissed++;
-    }
+    const finishedAt = doneAt(req);
+    const dueAt = req.slaResolutionDueAt || req.deadline;
+    if (!finishedAt || !dueAt) continue;
+    if (new Date(finishedAt) <= new Date(dueAt)) slaMet++;
+    else slaMissed++;
   }
 
-  // Overdue requests
-  const overdue = requests.filter(r =>
-    r.status !== 'completed' &&
-    r.deadline &&
-    new Date(r.deadline) < now
-  );
+  // Overdue = open requests past their SLA resolution target or deadline
+  const overdue = requests.filter((r: any) => {
+    if (!isOpen(r)) return false;
+    if (r.slaState === 'breached') return true;
+    const due = r.slaResolutionDueAt || r.deadline;
+    return Boolean(due) && new Date(due) < now;
+  });
 
   // By type
   const byType = new Map<string, number>();
@@ -611,22 +620,35 @@ export async function getAnalyticsRequestMetrics(windowDays: number = 30) {
     byStatus.set(req.status, (byStatus.get(req.status) || 0) + 1);
   }
 
-  // Average resolution time (completed only)
+  // Average resolution time uses the delivered/completed milestones
   const resolutionTimes: number[] = [];
   for (const req of completed) {
-    if (req.createdAt && req.updatedAt) {
-      const ms = new Date(req.updatedAt).getTime() - new Date(req.createdAt).getTime();
-      resolutionTimes.push(Math.floor(ms / (24 * 60 * 60 * 1000))); // days
+    const finishedAt = doneAt(req);
+    if (req.createdAt && finishedAt) {
+      const ms = new Date(finishedAt).getTime() - new Date(req.createdAt).getTime();
+      resolutionTimes.push(Math.floor(ms / (24 * 60 * 60 * 1000)));
     }
   }
   const avgResolutionDays = resolutionTimes.length > 0
     ? Number((resolutionTimes.reduce((a, b) => a + b, 0) / resolutionTimes.length).toFixed(1))
     : 0;
 
-  // Workload by owner
+  // First response time (created -> firstResponseAt) in hours
+  const firstResponseHours: number[] = [];
+  for (const req of requests) {
+    if (req.createdAt && req.firstResponseAt) {
+      const ms = new Date(req.firstResponseAt).getTime() - new Date(req.createdAt).getTime();
+      firstResponseHours.push(ms / (60 * 60 * 1000));
+    }
+  }
+  const avgFirstResponseHours = firstResponseHours.length > 0
+    ? Number((firstResponseHours.reduce((a, b) => a + b, 0) / firstResponseHours.length).toFixed(1))
+    : 0;
+
+  // Workload by internal Infosec owner
   const byOwner = new Map<string, number>();
-  for (const req of requests.filter(r => r.status !== 'completed')) {
-    const owner = req.owner || 'Unassigned';
+  for (const req of requests.filter(isOpen)) {
+    const owner = req.infosecOwnerId || req.owner || 'Unassigned';
     byOwner.set(owner, (byOwner.get(owner) || 0) + 1);
   }
 
@@ -638,6 +660,7 @@ export async function getAnalyticsRequestMetrics(windowDays: number = 30) {
     sla_compliance_pct: (slaMet + slaMissed) > 0 ? Number(((slaMet / (slaMet + slaMissed)) * 100).toFixed(1)) : 0,
     overdue_count: overdue.length,
     avg_resolution_days: avgResolutionDays,
+    avg_first_response_hours: avgFirstResponseHours,
     workload_by_owner: [...byOwner.entries()].map(([owner, count]) => ({ owner, count }))
   };
 }

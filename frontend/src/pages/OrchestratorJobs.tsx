@@ -152,7 +152,7 @@ export function OrchestratorJobs() {
 
   useEffect(() => {
     (async () => {
-      const r = await apiFetch('/clients');
+      const r = await apiFetch('/api/clients');
       if (r.ok) setClients(await r.json());
     })();
   }, [apiFetch]);
@@ -170,12 +170,12 @@ export function OrchestratorJobs() {
 
   useEffect(() => {
     (async () => {
-      const r = await apiFetch('/clients');
+      const r = await apiFetch('/api/clients');
       if (!r.ok) return;
       const allClients: Client[] = await r.json();
       const allReqs: ClientRequest[] = [];
       for (const c of allClients) {
-        const rr = await apiFetch(`/clients/${c.id}/requests`);
+        const rr = await apiFetch(`/api/clients/${c.id}/requests`);
         if (rr.ok) allReqs.push(...(await rr.json()));
       }
       setRequests(allReqs);
@@ -244,7 +244,7 @@ export function OrchestratorJobs() {
       setToast({ message: `Client request created: ${createdRequest.requestKey}`, type: 'success' });
       const allReqs: ClientRequest[] = [];
       for (const c of clients) {
-        const rr = await apiFetch(`/clients/${c.id}/requests`);
+        const rr = await apiFetch(`/api/clients/${c.id}/requests`);
         if (rr.ok) allReqs.push(...(await rr.json()));
       }
       setRequests(allReqs);

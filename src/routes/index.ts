@@ -1,4 +1,4 @@
-import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+﻿import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { Setting } from '../db/mongo/models';
 import { generateKnowledgeGraph, generateTermGraph, getGraphStats } from '../services/knowledgeGraph';
 import { analyzeGap } from '../services/gapFinder';
@@ -85,7 +85,6 @@ import {
   createClientRequest, 
   getClientRequest, 
   updateClientRequest, 
-  deleteClientRequest, 
   cleanAllData
 } from '../services/chat/chat';
 import { QAEntry } from '../db/mongo/models';
@@ -211,7 +210,7 @@ export async function routes(fastify: FastifyInstance) {
         const url = `http://${settings.ollamaHost}:${settings.ollamaPort}/api/tags`;
         const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
         if (!res.ok) return reply.code(502).send({ error: 'Failed to reach Ollama' });
-        const data = await res.json();
+        const data: any = await res.json();
         const models = (data.models || []).map((m: any) => ({
           name: m.name,
           size: m.size,
@@ -238,7 +237,7 @@ export async function routes(fastify: FastifyInstance) {
           signal: AbortSignal.timeout(15000),
         });
         if (!res.ok) return reply.code(502).send({ error: 'Failed to reach OpenAI' });
-        const data = await res.json();
+        const data: any = await res.json();
         const models = (data.data || [])
           .filter((m: any) => m.id.startsWith('gpt-') || m.id.startsWith('o'))
           .map((m: any) => ({ id: m.id, created: m.created, ownedBy: m.owned_by }));
@@ -283,8 +282,11 @@ export async function routes(fastify: FastifyInstance) {
     }
   );
 
-  fastify.get('/uploads/clients/:filename', async (request, reply) => {
-    const filename = (request.params as any).filename;
+  fastify.get(
+    '/uploads/clients/:filename',
+    { preHandler: [verifyToken] },
+    async (request, reply) => {
+    const filename = path.basename((request.params as any).filename);
     const filePath = path.join(process.cwd(), 'uploads', 'clients', filename);
     if (!fs.existsSync(filePath)) {
       return reply.code(404).send({ error: 'File not found' });
@@ -295,8 +297,11 @@ export async function routes(fastify: FastifyInstance) {
     return reply.send(stream);
   });
 
-  fastify.get('/uploads/requests/:filename', async (request, reply) => {
-    const filename = (request.params as any).filename;
+  fastify.get(
+    '/uploads/requests/:filename',
+    { preHandler: [verifyToken] },
+    async (request, reply) => {
+    const filename = path.basename((request.params as any).filename);
     const filePath = path.join(process.cwd(), 'uploads', 'requests', filename);
     if (!fs.existsSync(filePath)) {
       return reply.code(404).send({ error: 'File not found' });
@@ -366,6 +371,8 @@ export async function routes(fastify: FastifyInstance) {
     async (request: FastifyRequest<{ Body: { 
       name: string;
       clientType: string;
+      country?: string;
+      contact?: string;
       requestType?: string;
       sectionToReview?: string;
       deadline?: string;
@@ -383,7 +390,7 @@ export async function routes(fastify: FastifyInstance) {
         deadline: deadline ? new Date(deadline) : undefined,
         owner,
         comments,
-      });
+      } as any);
       return reply.code(201).send(client);
     }
   );
@@ -418,7 +425,7 @@ export async function routes(fastify: FastifyInstance) {
       const client = await updateClient(request.params.id, {
         ...rest,
         deadline: deadline ? new Date(deadline) : undefined,
-      });
+      } as any);
       if (!client) {
         return reply.code(404).send({ error: 'Client not found' });
       }
@@ -468,12 +475,12 @@ export async function routes(fastify: FastifyInstance) {
     '/clients/:clientId/requests',
     { preHandler: [verifyToken, requireRole('admin', 'manager', 'sme')] },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const { requestType, sectionToReview, deadline, owner, comments } = request.body;
+      const { requestType, sectionToReview, deadline, owner, comments } = request.body as any;
       if (!requestType) {
         return reply.code(400).send({ error: 'requestType is required' });
       }
       const clientRequest = await createClientRequest({
-        clientId: request.params.clientId,
+        clientId: (request.params as any).clientId,
         requestType,
         sectionToReview,
         deadline,
@@ -500,8 +507,8 @@ export async function routes(fastify: FastifyInstance) {
     '/requests/:id',
     { preHandler: [verifyToken, requireRole('admin', 'manager', 'sme')] },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const { requestType, sectionToReview, deadline, owner, comments, status } = request.body;
-      const clientRequest = await updateClientRequest(request.params.id, {
+      const { requestType, sectionToReview, deadline, owner, comments, status } = request.body as any;
+      const clientRequest = await updateClientRequest((request.params as any).id, {
         requestType,
         sectionToReview,
         deadline,
@@ -516,14 +523,7 @@ export async function routes(fastify: FastifyInstance) {
     }
   );
 
-  fastify.delete<{ Params: { id: string } }>(
-    '/requests/:id',
-    { preHandler: [verifyToken, requireRole('admin', 'manager', 'sme')] },
-    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      await deleteClientRequest(request.params.id);
-      return reply.code(204).send();
-    }
-  );
+  // DELETE /requests/:id is handled by request.routes.ts (soft delete + audit event).
 
   // Upload attachments to request
   const UPLOAD_REQUESTS_DIR = path.join(process.cwd(), 'uploads', 'requests');
@@ -546,23 +546,34 @@ export async function routes(fastify: FastifyInstance) {
         return reply.code(404).send({ error: 'Request not found' });
       }
 
-      const storedFilename = `${request.params.id}-${Date.now()}-${data.filename}`;
-      const filePath = path.join(UPLOAD_REQUESTS_DIR, storedFilename);
-      fs.writeFileSync(filePath, buffer);
+      // Route legacy uploads through the RequestDocument service so they get
+      // checksum dedupe, storage abstraction and a logbook event.
+      const { addRequestDocuments } = await import('../services/request/document.service');
+      const result = await addRequestDocuments({
+        requestId: request.params.id,
+        files: [{
+          filename: data.filename,
+          data: buffer,
+          mimetype: data.mimetype,
+        }],
+        actor: (request as any).user
+          ? {
+              id: String((request as any).user.id || (request as any).user.sub || ''),
+              username: (request as any).user.username,
+              role: (request as any).user.role,
+            }
+          : undefined,
+      });
 
-      const attachment = {
-        filename: storedFilename,
-        originalName: data.filename,
-        path: `/uploads/requests/${storedFilename}`,
-        mimeType: data.mimetype || undefined,
-        size: buffer.length,
-      };
-
-      requestDoc.attachments = requestDoc.attachments || [];
-      requestDoc.attachments.push(attachment);
-      await requestDoc.save();
-
-      return reply.code(201).send(attachment);
+      const created = result.documents[0];
+      return reply.code(201).send({
+        id: created?.id,
+        filename: created?.filename,
+        originalName: created?.originalName,
+        path: `/api/requests/${request.params.id}/documents/${created?.id}/download`,
+        mimeType: created?.mimeType,
+        size: created?.size,
+      });
     }
   );
 
@@ -584,7 +595,7 @@ export async function routes(fastify: FastifyInstance) {
     '/conversations',
     { preHandler: [verifyToken] },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const { clientId, title, agent, requestId } = request.body;
+      const { clientId, title, agent, requestId } = request.body as any;
       const conversation = await createConversation(clientId || 'default', title, agent, requestId);
       return reply.code(201).send(conversation);
     }
@@ -1040,6 +1051,15 @@ export async function routes(fastify: FastifyInstance) {
   );
 
   fastify.delete<{ Params: { id: string } }>(
+    '/kb/documents/:id',
+    { preHandler: [verifyToken, requireRole('admin', 'manager', 'sme')] },
+    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+      await deleteDocument(request.params.id);
+      return reply.code(204).send();
+    }
+  );
+
+  fastify.delete<{ Params: { id: string } }>(
     '/documents/:id',
     { preHandler: [verifyToken, requireRole('admin', 'manager', 'sme')] },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
@@ -1137,7 +1157,7 @@ export async function routes(fastify: FastifyInstance) {
 fastify.get('/qa/export',
     { preHandler: [verifyToken, requireRole('admin', 'manager', 'sme')] },
     async () => {
-      const content = await exportQAtext();
+      const content = await exportQAText();
       return content;
     }
   );
@@ -1409,12 +1429,12 @@ fastify.get('/qa/export',
     }
   );
 
-  // Public — list all published pages (for tree)
+  // Public â€” list all published pages (for tree)
   fastify.get('/cms/public/pages', async () => {
     return getAllPublishedPages();
   });
 
-  // Public endpoint — no auth, only published pages
+  // Public endpoint â€” no auth, only published pages
   fastify.get<{ Params: { slug: string } }>(
     '/cms/public/pages/:slug',
     async (request: FastifyRequest<{ Params: { slug: string } }>, reply: FastifyReply) => {
@@ -1452,7 +1472,7 @@ fastify.get('/qa/export',
     }
   );
 
-  // CMS — Check slug availability
+  // CMS â€” Check slug availability
   fastify.get<{ Querystring: { slug: string; excludeId?: string } }>(
     '/cms/pages/check-slug',
     { preHandler: [verifyToken, requireRole('admin', 'manager', 'sme')] },
@@ -1462,7 +1482,7 @@ fastify.get('/qa/export',
     }
   );
 
-  // CMS — Reorder pages (batch update parentId/order)
+  // CMS â€” Reorder pages (batch update parentId/order)
   fastify.put<{ Body: { updates: { _id: string; parentId: string | null; order: number }[] } }>(
     '/cms/pages/reorder',
     { preHandler: [verifyToken, requireRole('admin', 'manager', 'sme')] },
@@ -1622,7 +1642,7 @@ fastify.get<{ Querystring: { q: string; topK?: number } }>(
   async (request, reply) => {
     try {
       const query = request.query.q || '';
-      const topK = parseInt(request.query.topK as string) || 10000;
+      const topK = Number(request.query.topK) || 10000;
       
       if (!query || query.length < 2) {
         return reply.code(400).send({ error: 'Query is required (min 2 characters)' });
@@ -1655,4 +1675,24 @@ fastify.get<{ Querystring: { q: string; topK?: number } }>(
   // Canonical answer routes
   const { canonicalRoutes } = await import('./canonical.routes');
   fastify.register(canonicalRoutes);
+
+  // Request 360 + Logbook routes
+  const { requestRoutes } = await import('./request.routes');
+  fastify.register(requestRoutes);
+
+  // SLA policies, calendars and catalogs
+  const { slaRoutes } = await import('./sla.routes');
+  fastify.register(slaRoutes);
+
+  // CVE advisories and client impact tracking
+  const { cveRoutes } = await import('./cve.routes');
+  fastify.register(cveRoutes);
+
+  // Dashboards (global, client 360, workload)
+  const { dashboardRoutes } = await import('./dashboard.routes');
+  fastify.register(dashboardRoutes);
+
+  // Notifications and inbound email webhook
+  const { notificationRoutes } = await import('./notification.routes');
+  fastify.register(notificationRoutes);
 }

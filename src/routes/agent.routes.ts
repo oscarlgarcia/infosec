@@ -8,7 +8,7 @@ import {
   updateAgent,
   deleteAgent,
 } from '../services/agents/agent.service';
-import { Agent } from '../../db/mongo/models/agent';
+import { Agent } from '../db/mongo/models/agent';
 
 export async function agentRoutes(fastify: FastifyInstance) {
   // GET /agents - Obtener todos los agents activos

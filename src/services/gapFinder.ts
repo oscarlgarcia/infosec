@@ -1,4 +1,4 @@
-import { getChromaClient } from './chroma/indexer';
+﻿import { getChromaClient } from './chroma/indexer';
 import { createProviderEmbedding } from './llm/openai';
 
 interface GapAnalysis {
@@ -38,17 +38,17 @@ function determineSeverity(similarity: number): GapItem['severity'] {
   return 'high';
 }
 
-function generateAction(item: GapItem): { action: string; actionType: 'add-content' | 'add-qa' } {
+function generateAction(item: Pick<GapItem, 'title' | 'similarity' | 'severity'>): { action: string; actionType: 'add-content' | 'add-qa' } {
   const types: Array<{ action: string; actionType: 'add-content' | 'add-qa' }> = [
-    { action: 'Añadir contenido detallado sobre este tema', actionType: 'add-content' },
+    { action: 'AÃ±adir contenido detallado sobre este tema', actionType: 'add-content' },
     { action: 'Crear Q&A sobre: ' + item.title, actionType: 'add-qa' },
   ];
 
   if (item.similarity < 0.3) {
-    return { action: 'Añadir contenido completo sobre "' + item.title + '"', actionType: 'add-content' };
+    return { action: 'AÃ±adir contenido completo sobre "' + item.title + '"', actionType: 'add-content' };
   }
   if (item.severity === 'high') {
-    return { action: 'Crear Q&A y documentación sobre "' + item.title + '"', actionType: 'add-qa' };
+    return { action: 'Crear Q&A y documentaciÃ³n sobre "' + item.title + '"', actionType: 'add-qa' };
   }
   return types[Math.floor(Math.random() * types.length)];
 }
@@ -87,7 +87,7 @@ export async function analyzeGap(query: string, topK: number = 10000): Promise<G
       const results = await collection.query({
         queryEmbeddings: [queryEmbedding],
         nResults: topK,
-        include: ['metadatas', 'documents', 'distances']
+        include: ['metadatas', 'documents', 'distances'] as any
       });
       
       console.log(`[GapFinder] Query results from ${collectionName}:`, {
@@ -110,7 +110,7 @@ export async function analyzeGap(query: string, topK: number = 10000): Promise<G
       for (let i = 0; i < ids.length; i++) {
         const id = ids[i];
         const doc = documents[i] || '';
-        const metadata = metadatas[i] || {};
+        const metadata: any = metadatas[i] || {};
         const distance = distances[i] ?? 2;
         
         // ChromaDB with cosine space returns cosine DISTANCE (1 - similarity), NOT similarity!
@@ -119,11 +119,11 @@ export async function analyzeGap(query: string, topK: number = 10000): Promise<G
         
         // First: convert scaled values to normalized distance (0-1)
         if (distanceValue > 1) {
-          // Could be percentage (33.561) OR percentage×10 (335.6128)
+          // Could be percentage (33.561) OR percentageÃ—10 (335.6128)
           if (distanceValue > 100) {
-            distanceValue = distanceValue / 1000;  // 335.6128 → 0.33561 (distance)
+            distanceValue = distanceValue / 1000;  // 335.6128 â†’ 0.33561 (distance)
           } else {
-            distanceValue = distanceValue / 100;   // 33.561 → 0.33561 (distance)
+            distanceValue = distanceValue / 100;   // 33.561 â†’ 0.33561 (distance)
           }
         }
         
@@ -156,7 +156,7 @@ export async function analyzeGap(query: string, topK: number = 10000): Promise<G
         
         const title = metadata.title || metadata.question || doc.substring(0, 30) || id;
         
-        const actionInfo = generateAction({ id, title, similarity, severity: determineSeverity(similarity) });
+        const actionInfo = generateAction({ title, similarity, severity: determineSeverity(similarity) });
         
         const item: GapItem = {
           id,

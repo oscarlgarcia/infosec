@@ -1,4 +1,4 @@
-import { getChromaClient } from '../chroma/indexer';
+﻿import { getChromaClient } from '../chroma/indexer';
 import { createProviderEmbedding } from '../llm/openai';
 
 interface RetrievedPassage {
@@ -18,7 +18,7 @@ export async function retrieveRelevantPassages(args: {
   // Generate embedding for the query
   const queryEmbedding = await createProviderEmbedding(query);
   if (queryEmbedding.length === 0) {
-    console.warn('⚠️ No query embedding generated');
+    console.warn('âš ï¸ No query embedding generated');
     return [];
   }
 
@@ -44,7 +44,7 @@ export async function retrieveRelevantPassages(args: {
       const queryResult = await collection.query({
         queryEmbeddings: [queryEmbedding],
         nResults: perCollectionLimit,
-        include: ['metadatas', 'documents', 'distances']
+        include: ['metadatas', 'documents', 'distances'] as any
       });
 
       const ids = queryResult.ids?.[0] || [];
@@ -59,7 +59,7 @@ export async function retrieveRelevantPassages(args: {
         // ChromaDB with cosine space returns: distance = 1 - similarity
         let distanceValue = distance;
         
-        // Handle scaled values (335.6128 → 0.33561, or 33.561 → 0.33561)
+        // Handle scaled values (335.6128 â†’ 0.33561, or 33.561 â†’ 0.33561)
         if (distanceValue > 1) {
           if (distanceValue > 100) {
             distanceValue = distanceValue / 1000;
@@ -86,7 +86,7 @@ export async function retrieveRelevantPassages(args: {
         });
       }
     } catch (error) {
-      console.warn(`⚠️ Error querying collection ${name}:`, error);
+      console.warn(`âš ï¸ Error querying collection ${name}:`, error);
       // Continue with other collections
     }
   }

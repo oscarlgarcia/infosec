@@ -38,6 +38,16 @@ import { RulesManager } from './pages/RulesManager'
 import { TasksKanban } from './pages/TasksKanban'
 import { MetricsConfigurator } from './pages/MetricsConfigurator'
 import { OrchestratorJobs } from './pages/OrchestratorJobs'
+import { RequestsPage } from './pages/RequestsPage'
+import { RequestNewPage } from './pages/RequestNewPage'
+import { RequestDetailPage } from './pages/RequestDetailPage'
+import { Client360Page } from './pages/Client360Page'
+import { DashboardPage } from './pages/DashboardPage'
+import { CveListPage } from './pages/CveListPage'
+import { CveDetailPage } from './pages/CveDetailPage'
+import { SlaPoliciesPage } from './pages/SlaPoliciesPage'
+import { NotificationsPage } from './pages/NotificationsPage'
+import './styles/request360.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
@@ -285,6 +295,78 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
               element={
                 <ProtectedRoute>
                   <OrchestratorJobs />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/requests"
+              element={
+                <ProtectedRoute>
+                  <RequestsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/requests/new"
+              element={
+                <ProtectedRoute>
+                  <RequestNewPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/requests/:id"
+              element={
+                <ProtectedRoute>
+                  <RequestDetailPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/clients/:id"
+              element={
+                <ProtectedRoute>
+                  <Client360Page />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <DashboardPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/cve"
+              element={
+                <ProtectedRoute>
+                  <CveListPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/cve/:id"
+              element={
+                <ProtectedRoute>
+                  <CveDetailPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/sla-policies"
+              element={
+                <ProtectedRoute>
+                  <SlaPoliciesPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/notifications"
+              element={
+                <ProtectedRoute>
+                  <NotificationsPage />
                 </ProtectedRoute>
               }
             />

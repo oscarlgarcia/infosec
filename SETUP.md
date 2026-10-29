@@ -18,7 +18,7 @@ docker compose exec backend node scripts/setup-env.js
 
 ### 3. Verify
 - Open `http://localhost:5174`
-- Login with: `admin` / `admin123`
+- Login with: `admin` / `Admin123!@#`
 
 ---
 
@@ -43,7 +43,7 @@ node scripts/setup-env.js --qa-file=./data/my-qa.txt
 1. **Validates environment** - Checks JWT secrets are 32+ chars
 2. **Waits for services** - MongoDB, ChromaDB, Ollama
 3. **Creates default users:**
-   - `admin` / `admin123` (role: admin)
+   - `admin` / `Admin123!@#` (role: admin)
    - `manager` / `manager123` (role: manager)
    - `sme` / `sme123` (role: sme)
 4. **Imports QA entries** from `Q&A.txt` (if exists)

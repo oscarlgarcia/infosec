@@ -1,4 +1,4 @@
-import OpenAI from 'openai';
+﻿import OpenAI from 'openai';
 import { toFile } from 'openai/uploads';
 import { env } from '../../config';
 import { getLLMSettings } from './llmSettings';
@@ -145,6 +145,11 @@ export async function createEmbeddings(texts: string[]): Promise<number[][]> {
 export async function createOllamaEmbedding(text: string): Promise<number[]> {
   const EMBEDDING_MODELS = ['nomic-embed-text', 'mxbai-embed-large', 'snowflake-arctic-embed:latest'];
 
+  const input = text.length > 7000 ? text.slice(0, 7000) : text;
+  if (input !== text) {
+    console.warn(`âš ï¸ Truncating embedding input from ${text.length} to ${input.length} chars`);
+  }
+
   for (const model of EMBEDDING_MODELS) {
     try {
       const controller = new AbortController();
@@ -159,7 +164,7 @@ export async function createOllamaEmbedding(text: string): Promise<number[]> {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model,
-          prompt: text,
+          prompt: input,
         }),
         signal: controller.signal,
       });
@@ -167,10 +172,13 @@ export async function createOllamaEmbedding(text: string): Promise<number[]> {
       clearTimeout(timeout);
 
       if (response.ok) {
-        const data = await response.json();
+        const data: any = await response.json();
         if (data.embedding && data.embedding.length > 0) {
           return data.embedding;
         }
+      } else {
+        const errorBody = await response.text().catch(() => '');
+        console.warn(`Model ${model} embed failed (HTTP ${response.status}): ${errorBody.slice(0, 300)}`);
       }
     } catch (error) {
       console.warn(`Model ${model} failed:`, error);

@@ -144,12 +144,12 @@ export function AskKnowledgeBase() {
 
   const fetchClients = async () => {
     try {
-      const res = await apiFetch('/clients');
+      const res = await apiFetch('/api/clients');
       if (!res.ok) throw new Error(`Error fetching clients: ${res.status}`);
       const data = await res.json();
       setClients(data);
       if (data.length === 0 && !selectedClientId) {
-        const createRes = await apiFetch('/clients', {
+        const createRes = await apiFetch('/api/clients', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -172,7 +172,7 @@ export function AskKnowledgeBase() {
 
   const fetchRequests = async (clientId: string) => {
     try {
-      const res = await apiFetch(`/clients/${clientId}/requests`);
+      const res = await apiFetch(`/api/clients/${clientId}/requests`);
       if (!res.ok) throw new Error(`Error fetching requests: ${res.status}`);
       const data = await res.json();
       setRequests(data);
@@ -183,7 +183,7 @@ export function AskKnowledgeBase() {
 
   const handleCreateClient = async (data: { name: string; clientType: string; country?: string; contact?: string }) => {
     try {
-      const res = await apiFetch('/clients', {
+      const res = await apiFetch('/api/clients', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -201,7 +201,7 @@ export function AskKnowledgeBase() {
 
   const handleCreateRequest = async (clientId: string, data: { requestType: string; sectionToReview?: string; deadline?: string; owner?: string; comments?: string }) => {
     try {
-      const res = await apiFetch(`/clients/${clientId}/requests`, {
+      const res = await apiFetch(`/api/clients/${clientId}/requests`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -210,8 +210,10 @@ export function AskKnowledgeBase() {
       const newRequest = await res.json();
       setRequests(prev => [newRequest, ...prev]);
       setSelectedRequestId(newRequest.id);
+      return newRequest;
     } catch (err) {
       console.error('Error creating request:', err);
+      throw err;
     }
   };
 
@@ -434,7 +436,7 @@ export function AskKnowledgeBase() {
                 <button
                   className="client-info-edit-btn"
                   onClick={async () => {
-                    const res = await apiFetch(`/requests/${selectedRequestId}`);
+                    const res = await apiFetch(`/api/requests/${selectedRequestId}`);
                     if (!res.ok) throw new Error(`Error fetching request: ${res.status}`);
                     const data = await res.json();
                     setViewRequestData(data);
@@ -615,13 +617,13 @@ export function AskKnowledgeBase() {
         isOpen={showViewRequestModal}
         onClose={() => { setShowViewRequestModal(false); setViewRequestData(null); }}
         onUpdate={async (id, data) => {
-          await apiFetch(`/requests/${id}`, {
+          await apiFetch(`/api/requests/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data),
           });
           if (selectedClientId) fetchRequests(selectedClientId);
-          const res = await apiFetch(`/requests/${id}`);
+          const res = await apiFetch(`/api/requests/${id}`);
           if (res.ok) {
             const updatedData = await res.json();
             setViewRequestData(updatedData);
@@ -631,12 +633,12 @@ export function AskKnowledgeBase() {
           for (const file of files) {
             const formData = new FormData();
             formData.append('file', file);
-            await apiFetch(`/requests/${requestId}/attachments`, {
+            await apiFetch(`/api/requests/${requestId}/attachments`, {
               method: 'POST',
               body: formData,
             });
           }
-          const res = await apiFetch(`/requests/${requestId}`);
+          const res = await apiFetch(`/api/requests/${requestId}`);
           if (res.ok) {
             const updatedData = await res.json();
             setViewRequestData(updatedData);

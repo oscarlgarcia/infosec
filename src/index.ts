@@ -1,4 +1,4 @@
-import Fastify from 'fastify';
+﻿import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
 import jwt from '@fastify/jwt';
@@ -26,13 +26,18 @@ fastify.setErrorHandler((error, request, reply) => {
     stack: statusCode >= 500 ? error.stack : undefined,
   });
 
-  reply.code(statusCode).send({
+  const payload: Record<string, any> = {
     error: {
       code,
       message: error.message || 'Unexpected error',
       request_id: requestId,
     },
-  });
+  };
+  // Surface structured validation/dedupe information added by services.
+  if ((error as any).details !== undefined) payload.error.details = (error as any).details;
+  if ((error as any).duplicates !== undefined) payload.error.duplicates = (error as any).duplicates;
+
+  reply.code(statusCode).send(payload);
 });
 
 fastify.setNotFoundHandler((request, reply) => {
@@ -84,43 +89,54 @@ async function start() {
         const DEFAULT_METRICS = [
           { metricId: 'temporal-patterns', name: 'Request Temporal Patterns', nameEs: 'Patrones Temporales de Solicitudes', description: 'Distribution of requests by hour, day, month', category: 'temporal', endpoint: '/analytics/temporal-patterns', chartType: 'line', isActive: true, order: 1 },
           { metricId: 'client-activity', name: 'Client Activity', nameEs: 'Actividad por Cliente', description: 'Client request volumes and activity trends', category: 'client', endpoint: '/analytics/client-activity', chartType: 'bar', isActive: true, order: 2 },
-          { metricId: 'request-metrics', name: 'Request Metrics', nameEs: 'Métricas de Solicitudes', description: 'Request type distribution and status breakdown', category: 'request', endpoint: '/analytics/request-metrics', chartType: 'stat', isActive: true, order: 3 },
-          { metricId: 'kanban-metrics', name: 'Kanban Metrics', nameEs: 'Métricas Kanban', description: 'Task completion rates and workload balance', category: 'kanban', endpoint: '/analytics/kanban-metrics', chartType: 'stat', isActive: true, order: 4 },
+          { metricId: 'request-metrics', name: 'Request Metrics', nameEs: 'MÃ©tricas de Solicitudes', description: 'Request type distribution and status breakdown', category: 'request', endpoint: '/analytics/request-metrics', chartType: 'stat', isActive: true, order: 3 },
+          { metricId: 'kanban-metrics', name: 'Kanban Metrics', nameEs: 'MÃ©tricas Kanban', description: 'Task completion rates and workload balance', category: 'kanban', endpoint: '/analytics/kanban-metrics', chartType: 'stat', isActive: true, order: 4 },
           { metricId: 'agent-performance', name: 'Agent Performance', nameEs: 'Rendimiento de Agentes', description: 'Agent response times and request handling efficiency', category: 'agent', endpoint: '/analytics/agent-performance', chartType: 'stat', isActive: true, order: 5 },
-          { metricId: 'queue-metrics', name: 'Queue Metrics', nameEs: 'Métricas de Cola', description: 'Orchestrator queue performance and throughput', category: 'agent', endpoint: '/analytics/queue-metrics', chartType: 'stat', isActive: true, order: 6 },
+          { metricId: 'queue-metrics', name: 'Queue Metrics', nameEs: 'MÃ©tricas de Cola', description: 'Orchestrator queue performance and throughput', category: 'agent', endpoint: '/analytics/queue-metrics', chartType: 'stat', isActive: true, order: 6 },
         ];
         await MetricConfiguration.insertMany(DEFAULT_METRICS);
-        console.log('✅ Seeded default metric configurations');
+        console.log('âœ… Seeded default metric configurations');
       }
     } catch (seedError) {
-      console.warn('⚠️ Could not seed metrics:', (seedError as Error).message);
+      console.warn('âš ï¸ Could not seed metrics:', (seedError as Error).message);
     }
     
     // Initialize system agents
     try {
       const { initializeSystemAgents } = await import('./services/agents/agent.service');
       await initializeSystemAgents();
-      console.log('✅ System agents initialized');
+      console.log('âœ… System agents initialized');
     } catch (agentError) {
-      console.error('❌ Error initializing agents:', agentError);
+      console.error('âŒ Error initializing agents:', agentError);
     }
     
     // Start orchestrator queue polling
     try {
       const { startQueuePolling } = await import('./services/orchestrator/queue');
       startQueuePolling();
-      console.log('✅ Orchestrator queue polling started');
+      console.log('âœ… Orchestrator queue polling started');
     } catch (queueError) {
-      console.error('❌ Error starting orchestrator queue:', queueError);
+      console.error('âŒ Error starting orchestrator queue:', queueError);
     }
 
     // Start report scheduler
     try {
       const { startReportScheduler } = await import('./services/reports/scheduler');
       startReportScheduler();
-      console.log('✅ Report scheduler started');
+      console.log('âœ… Report scheduler started');
     } catch (schedulerError) {
-      console.error('❌ Error starting report scheduler:', schedulerError);
+      console.error('âŒ Error starting report scheduler:', schedulerError);
+    }
+
+    // Start SLA scheduler (Request 360)
+    if (env.REQUEST_360_ENABLED) {
+      try {
+        const { startSlaScheduler } = await import('./services/request/sla.service');
+        startSlaScheduler();
+        console.log('[Request360] SLA scheduler started');
+      } catch (slaError) {
+        console.error('[Request360] Error starting SLA scheduler:', slaError);
+      }
     }
     
     // Auto-reindex on startup if enabled in settings
@@ -128,27 +144,27 @@ async function start() {
       const { Setting } = await import('./db/mongo/models');
       const reindexSetting = await Setting.findOne({ key: 'auto_reindex_on_startup' });
       if (reindexSetting?.value === true) {
-        console.log('🔄 Auto-reindex on startup enabled, starting reindex...');
+        console.log('ðŸ”„ Auto-reindex on startup enabled, starting reindex...');
         const { reindexDocumentsToChroma } = await import('./services/kb/knowledge');
         const { reindexQAEntriesToChroma } = await import('./services/qa/qa');
         Promise.all([
           reindexDocumentsToChroma(),
           reindexQAEntriesToChroma(),
         ]).then(([kb, qa]) => {
-          console.log(`✅ Auto-reindex complete: KB=${kb.success} QA=${qa.success}`);
+          console.log(`âœ… Auto-reindex complete: KB=${kb.success} QA=${qa.success}`);
         }).catch(err => {
-          console.error('❌ Auto-reindex failed:', err);
+          console.error('âŒ Auto-reindex failed:', err);
         });
       }
     } catch (reindexError) {
-      console.warn('⚠️ Could not check auto-reindex setting:', (reindexError as Error).message);
+      console.warn('âš ï¸ Could not check auto-reindex setting:', (reindexError as Error).message);
     }
     
     // Test route
     fastify.get('/api/test', async () => ({ status: 'ok', time: new Date().toISOString() }));
     
     await fastify.listen({ port: env.PORT, host: '0.0.0.0' });
-    console.log(`🚀 Server running on http://localhost:${env.PORT}`);
+    console.log(`ðŸš€ Server running on http://localhost:${env.PORT}`);
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);

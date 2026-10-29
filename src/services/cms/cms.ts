@@ -1,4 +1,4 @@
-import { 
+﻿import { 
   Category, 
   Tag, 
   ContentPage, 
@@ -94,7 +94,7 @@ export async function reorderPages(updates: { _id: string; parentId: string | nu
       update: { $set: { parentId: u.parentId || null, order: u.order } },
     }
   }));
-  return ContentPage.bulkWrite(ops);
+  return ContentPage.bulkWrite(ops as any);
 }
 
 export async function createContentPage(data: {
@@ -260,7 +260,7 @@ export async function searchContent(query: string, limit: number = 10) {
       queryEmbeddings: [queryEmbedding[0]],
       nResults: limit,
       where: { status: 'published' },
-      include: ['metadatas', 'documents', 'distances']
+      include: ['metadatas', 'documents', 'distances'] as any
     });
 
     const searchResults: any[] = [];

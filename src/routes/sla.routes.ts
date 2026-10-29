@@ -1,0 +1,103 @@
+import { FastifyInstance } from 'fastify';
+import { verifyToken, requireRole } from '../middleware/auth';
+import { BusinessCalendar, Setting, SlaPolicy } from '../db/mongo/models';
+import { ContractTypes, ServiceModels } from '../types/request';
+import {
+  businessCalendarSchema,
+  parseOrThrow,
+  slaPolicySchema,
+} from '../schemas/request';
+import { ensureDefaultSlaConfiguration, runSlaSweep } from '../services/request/sla.service';
+
+const CATALOG_KEYS = {
+  contractTypes: 'catalog:contractTypes',
+  serviceModels: 'catalog:serviceModels',
+};
+
+async function getCatalog(key: string, fallback: readonly string[]) {
+  const setting = await Setting.findOne({ key }).lean();
+  if (Array.isArray(setting?.value) && setting!.value.length) return setting!.value as string[];
+  return [...fallback];
+}
+
+export async function slaRoutes(fastify: FastifyInstance) {
+  fastify.get('/sla-policies', { preHandler: [verifyToken] }, async () => {
+    await ensureDefaultSlaConfiguration();
+    const items = await SlaPolicy.find({}).populate('calendarId', 'name timezone').sort({ order: 1, createdAt: 1 }).lean();
+    return { items };
+  });
+
+  fastify.post('/sla-policies', { preHandler: [verifyToken, requireRole('admin')] }, async (request, reply) => {
+    const body = parseOrThrow(slaPolicySchema, request.body);
+    const policy = await SlaPolicy.create(body as any);
+    return reply.code(201).send(policy);
+  });
+
+  fastify.put<{ Params: { id: string } }>('/sla-policies/:id', { preHandler: [verifyToken, requireRole('admin')] }, async (request, reply) => {
+    const body = parseOrThrow(slaPolicySchema.partial(), request.body);
+    const policy = await SlaPolicy.findByIdAndUpdate(request.params.id, { $set: body as any }, { new: true });
+    if (!policy) return reply.code(404).send({ error: 'Policy not found' });
+    return policy;
+  });
+
+  fastify.delete<{ Params: { id: string } }>('/sla-policies/:id', { preHandler: [verifyToken, requireRole('admin')] }, async (request, reply) => {
+    await SlaPolicy.findByIdAndDelete(request.params.id);
+    return reply.code(204).send();
+  });
+
+  fastify.get('/business-calendars', { preHandler: [verifyToken] }, async () => {
+    await ensureDefaultSlaConfiguration();
+    const items = await BusinessCalendar.find({}).sort({ createdAt: 1 }).lean();
+    return { items };
+  });
+
+  fastify.post('/business-calendars', { preHandler: [verifyToken, requireRole('admin')] }, async (request, reply) => {
+    const body = parseOrThrow(businessCalendarSchema, request.body);
+    const calendar = await BusinessCalendar.create({
+      ...body,
+      holidays: (body.holidays || []).map((holiday) => new Date(holiday)),
+    } as any);
+    return reply.code(201).send(calendar);
+  });
+
+  fastify.put<{ Params: { id: string } }>('/business-calendars/:id', { preHandler: [verifyToken, requireRole('admin')] }, async (request, reply) => {
+    const body = parseOrThrow(businessCalendarSchema.partial(), request.body);
+    const update: Record<string, any> = { ...body };
+    if (body.holidays) update.holidays = body.holidays.map((holiday) => new Date(holiday));
+    const calendar = await BusinessCalendar.findByIdAndUpdate(request.params.id, { $set: update }, { new: true });
+    if (!calendar) return reply.code(404).send({ error: 'Calendar not found' });
+    return calendar;
+  });
+
+  fastify.delete<{ Params: { id: string } }>('/business-calendars/:id', { preHandler: [verifyToken, requireRole('admin')] }, async (request, reply) => {
+    await BusinessCalendar.findByIdAndDelete(request.params.id);
+    return reply.code(204).send();
+  });
+
+  fastify.get('/catalogs', { preHandler: [verifyToken] }, async () => {
+    return {
+      contractTypes: await getCatalog(CATALOG_KEYS.contractTypes, ContractTypes),
+      serviceModels: await getCatalog(CATALOG_KEYS.serviceModels, ServiceModels),
+    };
+  });
+
+  fastify.put<{ Params: { name: string } }>('/catalogs/:name', { preHandler: [verifyToken, requireRole('admin')] }, async (request, reply) => {
+    const name = request.params.name;
+    const key = (CATALOG_KEYS as any)[name];
+    if (!key) return reply.code(404).send({ error: 'Unknown catalog' });
+    const values = (request.body as any)?.values;
+    if (!Array.isArray(values) || !values.length) {
+      return reply.code(400).send({ error: 'values must be a non-empty array' });
+    }
+    const setting = await Setting.findOneAndUpdate(
+      { key },
+      { $set: { key, value: values } },
+      { upsert: true, new: true }
+    );
+    return { name, values: setting.value };
+  });
+
+  fastify.post('/sla/run-sweep', { preHandler: [verifyToken, requireRole('admin', 'manager')] }, async () => {
+    return runSlaSweep(new Date());
+  });
+}

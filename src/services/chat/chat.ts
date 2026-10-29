@@ -6,8 +6,8 @@ import { processQuestion } from '../agent/infosec-agent';
 import { newId } from '../../utils/ids';
 import { runChatQuery } from '../rag/orchestrator';
 import type { Conversation as ConversationType, Message, Client as ClientType, Attachment, ClientRequest as ClientRequestType } from '../../types';
-import { createTask, getTasks } from '../tasks/task.service';
-import { getLists } from '../tasks/list.service';
+import { createRequest, updateRequest, transitionRequest, softDeleteRequest } from '../request/request.service';
+import { serializeRequest } from '../request/serializer';
 
 const UPLOAD_DIR = path.join(process.cwd(), 'uploads', 'clients');
 
@@ -108,11 +108,6 @@ export async function deleteClient(id: string): Promise<void> {
   await Conversation.deleteMany({ clientId: new mongoose.Types.ObjectId(id) });
 }
 
-function generateRequestKey(clientName: string, requestType: string): string {
-  const date = new Date().toISOString().split('T')[0];
-  return `${clientName}-${requestType}-${date}`;
-}
-
 export async function createClientRequest(data: {
   clientId: string;
   requestType: string;
@@ -121,104 +116,45 @@ export async function createClientRequest(data: {
   owner?: string;
   comments?: string;
 }): Promise<ClientRequestType> {
-  const client = await Client.findById(data.clientId);
-  if (!client) {
-    throw new Error('Client not found');
-  }
-
-  const requestKey = generateRequestKey(client.name, data.requestType);
-
-  const deadlineDate = data.deadline ? (data.deadline.includes('T') ? new Date(data.deadline) : new Date(data.deadline + 'T00:00:00')) : undefined;
-
-  const request = await ClientRequest.create({
-    clientId: new mongoose.Types.ObjectId(data.clientId),
-    requestKey,
-    requestType: data.requestType,
-    sectionToReview: data.sectionToReview,
-    deadline: deadlineDate,
-    owner: data.owner,
-    comments: data.comments,
-    status: 'open',
-  });
-
-  // Auto-create Task in TODO list
-  try {
-    const lists = await getLists();
-    const todoList = lists.find((l: any) => l.name === 'TODO');
-    if (todoList && client) {
-      await createTask({
-        name: `${client.name} - ${data.requestType}`,
-        description: data.sectionToReview || '',
-        dueDate: deadlineDate,
-        listId: todoList._id.toString(),
-        requestId: request._id.toString(),
-        checklist: [
-          { text: 'Review', completed: false, order: 0 },
-          { text: 'Assign to Team', completed: false, order: 1 },
-          { text: 'Respond', completed: false, order: 2 },
-        ],
-      });
-    }
-  } catch (err) {
-    console.error('Error auto-creating task:', err);
-  }
-  
-  return {
-    id: (request as any)._id.toString(),
-    clientId: request.clientId.toString(),
-    requestKey: request.requestKey,
-    requestType: request.requestType,
-    sectionToReview: request.sectionToReview,
-    deadline: request.deadline,
-    owner: request.owner,
-    comments: request.comments,
-    status: request.status as 'open' | 'in_progress' | 'completed',
-    attachments: request.attachments || [],
-    createdAt: request.createdAt,
-    updatedAt: request.updatedAt,
-  };
+  // Delegate to the Request 360 service so numbering, SLA, events and the
+  // Kanban task are created exactly once.
+  const created = await createRequest(
+    {
+      clientId: data.clientId,
+      requestType: data.requestType as any,
+      sectionToReview: data.sectionToReview,
+      deadline: data.deadline,
+      owner: data.owner,
+      comments: data.comments,
+    },
+    { username: 'legacy-api' }
+  );
+  return created as unknown as ClientRequestType;
 }
 
 export async function getClientRequests(clientId: string): Promise<ClientRequestType[]> {
-  const requests = await ClientRequest.find({ clientId: new mongoose.Types.ObjectId(clientId) })
+  const requests = await ClientRequest.find({
+    clientId: new mongoose.Types.ObjectId(clientId),
+    isDeleted: { $ne: true },
+  })
     .sort({ createdAt: -1 })
     .lean();
 
-  return requests.map((req: any) => ({
-    id: req._id.toString(),
-    clientId: req.clientId.toString(),
-    requestKey: req.requestKey,
-    requestType: req.requestType,
-    sectionToReview: req.sectionToReview,
-    deadline: req.deadline,
-    owner: req.owner,
-    comments: req.comments,
-    status: req.status as 'open' | 'in_progress' | 'completed',
-    attachments: req.attachments || [],
-    createdAt: req.createdAt,
-    updatedAt: req.updatedAt,
-  }));
+  return requests.map((req: any) => serializeRequest(req) as unknown as ClientRequestType);
 }
 
 export async function getClientRequest(id: string): Promise<ClientRequestType | null> {
+  if (!mongoose.Types.ObjectId.isValid(id)) return null;
   const request = await ClientRequest.findById(id).lean();
   if (!request) return null;
-
-  return {
-    id: (request as any)._id.toString(),
-    clientId: request.clientId.toString(),
-    requestKey: request.requestKey,
-    requestType: request.requestType,
-    sectionToReview: request.sectionToReview,
-    deadline: request.deadline,
-    owner: request.owner,
-    comments: request.comments,
-    status: request.status as 'open' | 'in_progress' | 'completed',
-    attachments: request.attachments || [],
-    createdAt: request.createdAt,
-    updatedAt: request.updatedAt,
-  };
+  return serializeRequest(request) as unknown as ClientRequestType;
 }
+
+const LEGACY_STATUS_TO_NEW: Record<string, string> = {
+  open: 'new',
+  in_progress: 'working',
+  completed: 'delivered',
+};
 
 export async function updateClientRequest(id: string, data: Partial<{
   requestType: string;
@@ -228,40 +164,24 @@ export async function updateClientRequest(id: string, data: Partial<{
   comments: string;
   status: 'open' | 'in_progress' | 'completed';
 }>): Promise<ClientRequestType | null> {
-  const updateData: any = { ...data };
-  if (data.deadline) {
-    updateData.deadline = new Date(data.deadline);
+  const { status, comments, ...rest } = data;
+  const update: Record<string, any> = { ...rest };
+  if (comments !== undefined) update.comments = comments;
+
+  if (status) {
+    const target = LEGACY_STATUS_TO_NEW[status] || status;
+    await transitionRequest(id, target, { reason: 'Legacy status update', actor: { username: 'legacy-api' } });
+  }
+  if (Object.keys(update).length) {
+    await updateRequest(id, update as any, { username: 'legacy-api' });
   }
 
-  const request = await ClientRequest.findByIdAndUpdate(id, updateData, { new: true }).lean();
-  if (!request) return null;
-
-  return {
-    id: (request as any)._id.toString(),
-    clientId: request.clientId.toString(),
-    requestKey: request.requestKey,
-    requestType: request.requestType,
-    sectionToReview: request.sectionToReview,
-    deadline: request.deadline,
-    owner: request.owner,
-    comments: request.comments,
-    status: request.status as 'open' | 'in_progress' | 'completed',
-    attachments: (request.attachments || []).map((a: any) => ({
-      id: a._id?.toString() || a.filename,
-      filename: a.filename,
-      originalName: a.originalName,
-      path: a.path,
-      mimeType: a.mimeType,
-      size: a.size,
-      createdAt: a.createdAt,
-    })),
-    createdAt: request.createdAt,
-    updatedAt: request.updatedAt,
-  };
+  return getClientRequest(id);
 }
 
 export async function deleteClientRequest(id: string): Promise<void> {
-  await ClientRequest.findByIdAndDelete(id);
+  // Requests are soft-deleted to preserve the logbook.
+  await softDeleteRequest(id, { username: 'legacy-api' }, 'Legacy delete');
 }
 
 export async function cleanAllData(): Promise<void> {

@@ -1,4 +1,4 @@
-import { QAEntry } from '../../db/mongo/models';
+﻿import { QAEntry } from '../../db/mongo/models';
 import { createProviderEmbedding } from '../llm/openai';
 import { getChromaClient } from '../chroma/indexer';
 
@@ -90,7 +90,7 @@ export async function generateQAEmbeddings(): Promise<number> {
   }).lean();
   
   let generated = 0;
-  console.log(`🔄 Generating embeddings for ${entries.length} QA entries...`);
+  console.log(`ðŸ”„ Generating embeddings for ${entries.length} QA entries...`);
   
   for (const entry of entries as any[]) {
     try {
@@ -101,15 +101,15 @@ export async function generateQAEmbeddings(): Promise<number> {
       });
       generated++;
       if (generated % 10 === 0) {
-        console.log(`✅ Generated ${generated}/${entries.length} embeddings`);
+        console.log(`âœ… Generated ${generated}/${entries.length} embeddings`);
       }
     } catch (err) {
-      console.error(`❌ Failed to generate embedding for: ${entry.question.substring(0, 50)}...`);
+      console.error(`âŒ Failed to generate embedding for: ${entry.question.substring(0, 50)}...`);
       await QAEntry.findByIdAndUpdate(entry._id, { embeddingStatus: 'failed' });
     }
   }
   
-  console.log(`✅ Total embeddings generated: ${generated}`);
+  console.log(`âœ… Total embeddings generated: ${generated}`);
   return generated;
 }
 
@@ -119,7 +119,7 @@ export async function semanticSearchQA(query: string, minSimilarity: number = 0)
   try {
     const queryEmbedding = await createProviderEmbedding(query);
     if (!queryEmbedding.length) {
-      console.error('❌ No query embedding generated');
+      console.error('âŒ No query embedding generated');
       return [];
     }
     
@@ -129,14 +129,14 @@ export async function semanticSearchQA(query: string, minSimilarity: number = 0)
     }).lean();
     
     if (entries.length === 0) {
-      console.warn('⚠️ No QA entries with embeddings found');
+      console.warn('âš ï¸ No QA entries with embeddings found');
       return [];
     }
     
     const results: QASearchResult[] = entries
       .map((e: any) => {
         const similarity = cosineSimilarity(queryEmbedding, e.embedding || []);
-        const matchType = similarity >= 0.95 ? 'exact' : similarity >= 0.75 ? 'similar' : 'none';
+        const matchType: QASearchResult['matchType'] = similarity >= 0.95 ? 'exact' : similarity >= 0.75 ? 'similar' : 'none';
         return {
           id: e._id.toString(),
           question: e.question,
@@ -152,7 +152,7 @@ export async function semanticSearchQA(query: string, minSimilarity: number = 0)
     
     return results;
   } catch (err) {
-    console.error('❌ Semantic search failed:', err);
+    console.error('âŒ Semantic search failed:', err);
     return [];
   }
 }
@@ -193,7 +193,7 @@ function parseQAText(content: string): ParsedQA[] {
   let currentDomain = '';
   let i = 0;
   
-  for (const domain of INFOSEC_DOMAINS) {
+  for (const domain of INFOSEC_DOMAIN_LIST) {
     const domainIndex = lines.findIndex(l => l.startsWith(domain) || l.includes(domain));
     if (domainIndex !== -1) {
       const sectionTitle = lines[domainIndex + 1]?.match(/^(\d+\.\d+)\s+(.+)/);
@@ -210,7 +210,7 @@ function parseQAText(content: string): ParsedQA[] {
     const numberMatch = line.match(/^(\d+\.\d+)\s+(.+)/);
     
     let detectedDomain = '';
-    for (const domain of INFOSEC_DOMAINS) {
+    for (const domain of INFOSEC_DOMAIN_LIST) {
       if (line.includes(domain)) {
         detectedDomain = domain;
         break;
@@ -233,7 +233,7 @@ function parseQAText(content: string): ParsedQA[] {
         const nextNumberMatch = nextLine.match(/^(\d+\.\d+)\s+/);
         
         let nextSectionDomain = '';
-        for (const domain of INFOSEC_DOMAINS) {
+        for (const domain of INFOSEC_DOMAIN_LIST) {
           if (nextLine.includes(domain)) {
             nextSectionDomain = domain;
             break;
@@ -337,7 +337,7 @@ export async function deleteQA(id: string): Promise<void> {
 }
 
 export async function importQAText(content: string, source: string = 'import'): Promise<{ imported: number; skipped: number }> {
-  console.log('🗑️ Deleting existing QA entries...');
+  console.log('ðŸ—‘ï¸ Deleting existing QA entries...');
   await QAEntry.deleteMany({});
   
   const parsed = parseQAText(content);
@@ -345,7 +345,7 @@ export async function importQAText(content: string, source: string = 'import'): 
   let imported = 0;
   let skipped = 0;
   
-  console.log(`🔄 Importing ${parsed.length} Q&A entries with embeddings...`);
+  console.log(`ðŸ”„ Importing ${parsed.length} Q&A entries with embeddings...`);
   
   const chromaEntries: Array<{ id: string; text: string; question: string; answer: string; domain: string }> = [];
   
@@ -357,7 +357,7 @@ export async function importQAText(content: string, source: string = 'import'): 
       embedding = await createProviderEmbedding(qa.question);
       embeddingStatus = embedding.length > 0 ? 'generated' : 'failed';
     } catch (err) {
-      console.error(`❌ Failed to create embedding for: ${qa.question.substring(0, 30)}...`);
+      console.error(`âŒ Failed to create embedding for: ${qa.question.substring(0, 30)}...`);
       embeddingStatus = 'failed';
     }
     
@@ -383,12 +383,12 @@ export async function importQAText(content: string, source: string = 'import'): 
     }
     
     if (imported % 20 === 0) {
-      console.log(`✅ Imported ${imported}/${parsed.length} entries`);
+      console.log(`âœ… Imported ${imported}/${parsed.length} entries`);
     }
   }
   
   if (chromaEntries.length > 0) {
-    console.log(`🔄 Indexing ${chromaEntries.length} entries in ChromaDB...`);
+    console.log(`ðŸ”„ Indexing ${chromaEntries.length} entries in ChromaDB...`);
     try {
       const client = await getChromaClient();
       const collection = await client.getOrCreateCollection({ name: 'qanda' });
@@ -411,16 +411,16 @@ export async function importQAText(content: string, source: string = 'import'): 
             });
           }
         } catch (err) {
-          console.error(`❌ Failed to index in Chroma: ${entry.question.substring(0, 30)}...`);
+          console.error(`âŒ Failed to index in Chroma: ${entry.question.substring(0, 30)}...`);
         }
       }
-      console.log(`✅ Indexed ${chromaEntries.length} entries in ChromaDB`);
+      console.log(`âœ… Indexed ${chromaEntries.length} entries in ChromaDB`);
     } catch (err) {
-      console.error('❌ Failed to index entries in ChromaDB:', err);
+      console.error('âŒ Failed to index entries in ChromaDB:', err);
     }
   }
   
-  console.log(`✅ Import complete: ${imported} entries imported`);
+  console.log(`âœ… Import complete: ${imported} entries imported`);
   return { imported, skipped };
 }
 
@@ -456,15 +456,15 @@ export async function getQAById(id: string): Promise<QA | null> {
 
 export async function reindexQAEntriesToChroma(): Promise<{ success: number; failed: number }> {
   const entries = await QAEntry.find({}).lean() as any[];
-  console.log(`🔄 Re-indexing ${entries.length} QA entries to ChromaDB...`);
+  console.log(`ðŸ”„ Re-indexing ${entries.length} QA entries to ChromaDB...`);
   
   const client = await getChromaClient();
   
   try {
     await client.deleteCollection({ name: 'qanda' });
-    console.log('🗑️ Cleared qanda collection');
+    console.log('ðŸ—‘ï¸ Cleared qanda collection');
   } catch (e) {
-    console.log('ℹ️ qanda collection did not exist');
+    console.log('â„¹ï¸ qanda collection did not exist');
   }
   
   const collection = await client.getOrCreateCollection({ name: 'qanda' });
@@ -501,17 +501,17 @@ export async function reindexQAEntriesToChroma(): Promise<{ success: number; fai
       
       success++;
       if (success % 20 === 0) {
-        console.log(`✅ Indexed ${success}/${entries.length}`);
+        console.log(`âœ… Indexed ${success}/${entries.length}`);
       }
 
       await new Promise(r => setTimeout(r, 50));
 
     } catch (err) {
-      console.error(`❌ Failed to index ${entry._id}:`, err);
+      console.error(`âŒ Failed to index ${entry._id}:`, err);
       failed++;
     }
   }
   
-  console.log(`✅ Re-index complete: ${success} success, ${failed} failed`);
+  console.log(`âœ… Re-index complete: ${success} success, ${failed} failed`);
   return { success, failed };
 }

@@ -35,6 +35,8 @@ types {
 server {
     listen 80;
     server_name localhost;
+
+    client_max_body_size 100m;
     
     root /usr/share/nginx/html;
     index index.html;
@@ -58,7 +60,9 @@ server {
     }
 
     # API routes (root-level OK - no SPA route conflict, e.g. GET /agents)
-    location ~ ^/(agents|rules|users|clients|conversations|task-lists|requests|auth)(/|$) {
+    # `/requests` and `/clients/:id` are SPA routes, so they are intentionally
+    # excluded here. Frontend code must call those APIs through /api/.
+    location ~ ^/(agents|rules|users|conversations|task-lists|auth)(/|$) {
         rewrite ^/(.*)$ /api/$1 break;
         proxy_pass http://infosec-backend:3000;
         proxy_http_version 1.1;

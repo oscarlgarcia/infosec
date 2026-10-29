@@ -1,4 +1,38 @@
-import mongoose, { Schema, Document } from 'mongoose';
+﻿import mongoose, { Schema, Document } from 'mongoose';
+import {
+  Classifications,
+  ClientPhases,
+  ContractTypes,
+  CustomerStatuses,
+  DocumentTypes,
+  Priorities,
+  RequestChannels,
+  RequestKinds,
+  RequestStatuses,
+  RequestTypes,
+  ServiceModels,
+  Severities,
+  SlaStates,
+  StakeholderPartyTypes,
+  StakeholderRoles,
+  TaskTypes,
+  Visibilities,
+} from '../../types/request';
+
+interface AnyDoc {
+  _id: any;
+  [key: string]: any;
+}
+type AnyModel = mongoose.Model<AnyDoc>;
+
+/**
+ * Mongoose 7 + TypeScript resolves `mongoose.models.X || mongoose.model(...)`
+ * as a union of two Model types, which breaks inference in every consumer.
+ * Casting to a single AnyModel keeps the codebase compiling.
+ */
+function model(name: string, schema: Schema): AnyModel {
+  return (mongoose.models[name] || mongoose.model(name, schema)) as AnyModel;
+}
 
 // Setting Model for key-value configuration
 export interface ISetting extends Document {
@@ -18,7 +52,7 @@ SettingSchema.pre('save', function(next) {
   next();
 });
 
-export const Setting = mongoose.models.Setting || mongoose.model<ISetting>('Setting', SettingSchema);
+export const Setting = model('Setting', SettingSchema);
 
 export const MessageSchema = new Schema({
   role: { type: String, enum: ['user', 'assistant', 'system'], required: true },
@@ -37,18 +71,16 @@ export const AttachmentSchema = new Schema({
 }, { timestamps: true });
 
 export const ClientType = ['Cloud', 'Rent', 'PS'] as const;
-export const RequestType = [
-  'RFI/RFP',
-  'Customer Agreement Review',
-  'Customer Agreements Execution',
-  'InfoSec Support',
-  '3rd Party PT',
-  'BC/DR Test Result Request',
-  'Cloud Customer PT Request',
-  'Certification Request',
-  'Other Support',
-  'Answer Builder'
-] as const;
+export const RequestType = RequestTypes;
+
+export const StakeholderSchema = new Schema({
+  name: { type: String, required: true },
+  email: { type: String },
+  organization: { type: String },
+  role: { type: String, enum: StakeholderRoles, default: 'other' },
+  partyType: { type: String, enum: StakeholderPartyTypes, default: 'client' },
+  userId: { type: String },
+}, { _id: false });
 
 export const ClientSchema = new Schema({
   name: { type: String, required: true },
@@ -56,25 +88,122 @@ export const ClientSchema = new Schema({
   country: { type: String },
   contact: { type: String },
   attachments: [AttachmentSchema],
+
+  // Request 360 account fields
+  customerStatus: { type: String, enum: CustomerStatuses, default: 'active', index: true },
+  currentPhase: { type: String, enum: ClientPhases, default: 'active' },
+  contractSigned: { type: Boolean, default: false },
+  contractType: { type: String, enum: ContractTypes },
+  serviceModel: { type: String, enum: ServiceModels },
+  businessUnit: { type: String },
+  tags: { type: [String], default: [] },
+  salesOwnerId: { type: String, index: true },
+  clientOwnerId: { type: String, index: true },
+  infosecOwnerId: { type: String, index: true },
+  infosecRepoUrl: { type: String },
+  stakeholders: { type: [StakeholderSchema], default: [] },
+  cveSubscriptions: {
+    enabled: { type: Boolean, default: false },
+    severityThreshold: { type: String, enum: Severities, default: 'high' },
+    recipients: { type: [String], default: [] },
+  },
+  createdBy: { type: String },
+  updatedBy: { type: String },
 }, { timestamps: true });
+
+export const ClientRequestSnapshotSchema = new Schema({
+  name: { type: String },
+  country: { type: String },
+  clientType: { type: String },
+  contractType: { type: String },
+  contractSigned: { type: Boolean },
+  serviceModel: { type: String },
+  businessUnit: { type: String },
+  customerStatus: { type: String },
+  currentPhase: { type: String },
+  stakeholders: { type: [StakeholderSchema], default: [] },
+}, { _id: false });
 
 // Client Request Schema
 export const ClientRequestSchema = new Schema({
   clientId: { type: Schema.Types.ObjectId, ref: 'Client', required: true, index: true },
-  requestKey: { type: String, required: true },
-  requestType: { type: String, enum: RequestType, required: true },
+  requestKey: { type: String, required: true, unique: true, index: true },
+  legacyRequestKey: { type: String },
+  requestKind: { type: String, enum: RequestKinds, default: 'standard', index: true },
+  requestType: { type: String, enum: RequestType, required: true, index: true },
+  title: { type: String },
   sectionToReview: { type: String },
-  deadline: { type: Date },
+  scope: { type: String },
+  deadline: { type: Date, index: true },
   owner: { type: String },
   comments: { type: String },
-  status: { type: String, enum: ['open', 'in_progress', 'completed'], default: 'open' },
+  legacyComments: { type: String },
+  status: {
+    type: String,
+    enum: [...RequestStatuses, 'open', 'in_progress', 'completed'],
+    default: 'open',
+    index: true,
+  },
+  substatus: { type: String },
+
+  // Intake 360
+  priority: { type: String, enum: Priorities, default: 'P3', index: true },
+  severity: { type: String, enum: Severities, default: 'medium' },
+  requestChannel: { type: String, enum: RequestChannels, default: 'email' },
+  tags: { type: [String], default: [], index: true },
+  businessUnit: { type: String },
+  contractType: { type: String, enum: ContractTypes },
+  clientType: { type: String },
+  contractSigned: { type: Boolean, default: false },
+  serviceModel: { type: String, enum: ServiceModels },
+  salesOwnerId: { type: String, index: true },
+  clientOwnerId: { type: String, index: true },
+  infosecOwnerId: { type: String, index: true },
+  infosecRepoUrl: { type: String },
+  stakeholders: { type: [StakeholderSchema], default: [] },
+  clientSnapshot: { type: ClientRequestSnapshotSchema },
+  templateId: { type: Schema.Types.ObjectId, ref: 'RequestTemplate' },
+
+  // SLA and derived milestones (event-based, never updatedAt)
+  slaPolicyId: { type: Schema.Types.ObjectId, ref: 'SlaPolicy' },
+  slaState: { type: String, enum: SlaStates, default: 'on_track', index: true },
+  slaResponseDueAt: { type: Date },
+  slaResolutionDueAt: { type: Date },
+  slaPausedAt: { type: Date },
+  pausedMsTotal: { type: Number, default: 0 },
+  firstResponseAt: { type: Date },
+  deliveredAt: { type: Date },
+  completedAt: { type: Date },
+  closedAt: { type: Date },
+  reopenCount: { type: Number, default: 0 },
+  lastActivityAt: { type: Date, default: Date.now, index: true },
+
+  duplicateOf: { type: Schema.Types.ObjectId, ref: 'ClientRequest' },
+  mergedInto: { type: Schema.Types.ObjectId, ref: 'ClientRequest' },
+
+  // Soft delete: requests are never physically removed
+  isDeleted: { type: Boolean, default: false, index: true },
+  deletedAt: { type: Date },
+  deletedBy: { type: String },
+  deleteReason: { type: String },
+
   attachments: [AttachmentSchema],
+  createdBy: { type: String },
+  updatedBy: { type: String },
 }, { timestamps: true });
+
+ClientRequestSchema.index({ clientId: 1, status: 1, createdAt: -1 });
+ClientRequestSchema.index({ status: 1, priority: 1, deadline: 1 });
+ClientRequestSchema.index({ salesOwnerId: 1, status: 1 });
+ClientRequestSchema.index({ clientOwnerId: 1, status: 1 });
+ClientRequestSchema.index({ infosecOwnerId: 1, status: 1 });
+ClientRequestSchema.index({ lastActivityAt: -1 });
+
 
 export const ConversationSchema = new Schema({
   clientId: { type: Schema.Types.ObjectId, ref: 'Client', required: true, index: true },
   requestId: { type: Schema.Types.ObjectId, ref: 'ClientRequest', index: true },
-  title: { type: String, required: true, default: 'Nueva conversación' },
+  title: { type: String, required: true, default: 'Nueva conversaciÃ³n' },
   agent: { type: String, default: 'InfoSec' },
   favorite: { type: Boolean, default: false },
   messages: [MessageSchema],
@@ -439,37 +568,37 @@ export const QueueItemSchema = new Schema({
 }, { timestamps: true });
 
 // Export models
-export const OrchestratorJob = mongoose.models.OrchestratorJob || mongoose.model('OrchestratorJob', OrchestratorJobSchema);
-export const QueueItem = mongoose.models.QueueItem || mongoose.model('QueueItem', QueueItemSchema);
+export const OrchestratorJob = model('OrchestratorJob', OrchestratorJobSchema);
+export const QueueItem = model('QueueItem', QueueItemSchema);
 
 
-export const Client = mongoose.models.Client || mongoose.model('Client', ClientSchema);
-export const ClientRequest = mongoose.models.ClientRequest || mongoose.model('ClientRequest', ClientRequestSchema);
-export const Conversation = mongoose.models.Conversation || mongoose.model('Conversation', ConversationSchema);
-export const DocumentModel = mongoose.models.Document || mongoose.model('Document', DocumentSchema);
-export const QAEntry = mongoose.models.QAEntry || mongoose.model('QAEntry', QAEntrySchema);
+export const Client = model('Client', ClientSchema);
+export const ClientRequest = model('ClientRequest', ClientRequestSchema);
+export const Conversation = model('Conversation', ConversationSchema);
+export const DocumentModel = model('DocumentModel', DocumentSchema);
+export const QAEntry = model('QAEntry', QAEntrySchema);
 
 // CMS Models
-export const Category = mongoose.models.Category || mongoose.model('Category', CategorySchema);
-export const Tag = mongoose.models.Tag || mongoose.model('Tag', TagSchema);
-export const ContentPage = mongoose.models.ContentPage || mongoose.model('ContentPage', ContentPageSchema);
-export const Bookmark = mongoose.models.Bookmark || mongoose.model('Bookmark', BookmarkSchema);
-export const RecentAccess = mongoose.models.RecentAccess || mongoose.model('RecentAccess', RecentAccessSchema);
-export const FAQ = mongoose.models.FAQ || mongoose.model('FAQ', FAQSchema);
-export const KnowledgeBookmark = mongoose.models.KnowledgeBookmark || mongoose.model('KnowledgeBookmark', KnowledgeBookmarkSchema);
-export const KnowledgeRecentAccess = mongoose.models.KnowledgeRecentAccess || mongoose.model('KnowledgeRecentAccess', KnowledgeRecentAccessSchema);
+export const Category = model('Category', CategorySchema);
+export const Tag = model('Tag', TagSchema);
+export const ContentPage = model('ContentPage', ContentPageSchema);
+export const Bookmark = model('Bookmark', BookmarkSchema);
+export const RecentAccess = model('RecentAccess', RecentAccessSchema);
+export const FAQ = model('FAQ', FAQSchema);
+export const KnowledgeBookmark = model('KnowledgeBookmark', KnowledgeBookmarkSchema);
+export const KnowledgeRecentAccess = model('KnowledgeRecentAccess', KnowledgeRecentAccessSchema);
 
 // Auth Models
-export const User = mongoose.models.User || mongoose.model('User', UserSchema);
-export const SessionSummary = mongoose.models.SessionSummary || mongoose.model('SessionSummary', SessionSummarySchema);
-export const AnswerRule = mongoose.models.AnswerRule || mongoose.model('AnswerRule', AnswerRuleSchema);
-export const CanonicalAnswer = mongoose.models.CanonicalAnswer || mongoose.model('CanonicalAnswer', CanonicalAnswerSchema);
-export const KbCandidate = mongoose.models.KbCandidate || mongoose.model('KbCandidate', KbCandidateSchema);
-export const ResponseTrace = mongoose.models.ResponseTrace || mongoose.model('ResponseTrace', ResponseTraceSchema);
-export const AnalyticsEvent = mongoose.models.AnalyticsEvent || mongoose.model('AnalyticsEvent', AnalyticsEventSchema);
-export const QuestionCoverage = mongoose.models.QuestionCoverage || mongoose.model('QuestionCoverage', QuestionCoverageSchema);
-export const DocumentUsage = mongoose.models.DocumentUsage || mongoose.model('DocumentUsage', DocumentUsageSchema);
-export const GapBacklog = mongoose.models.GapBacklog || mongoose.model('GapBacklog', GapBacklogSchema);
+export const User = model('User', UserSchema);
+export const SessionSummary = model('SessionSummary', SessionSummarySchema);
+export const AnswerRule = model('AnswerRule', AnswerRuleSchema);
+export const CanonicalAnswer = model('CanonicalAnswer', CanonicalAnswerSchema);
+export const KbCandidate = model('KbCandidate', KbCandidateSchema);
+export const ResponseTrace = model('ResponseTrace', ResponseTraceSchema);
+export const AnalyticsEvent = model('AnalyticsEvent', AnalyticsEventSchema);
+export const QuestionCoverage = model('QuestionCoverage', QuestionCoverageSchema);
+export const DocumentUsage = model('DocumentUsage', DocumentUsageSchema);
+export const GapBacklog = model('GapBacklog', GapBacklogSchema);
 
 // Term Report Models
 const TermReportSourceSchema = new Schema({
@@ -540,9 +669,9 @@ const TermReportSnapshotSchema = new Schema({
   generatedAt: { type: Date, default: Date.now },
 });
 
-export const TermReport = mongoose.models.TermReport || mongoose.model('TermReport', TermReportSchema);
-export const TermReportSchedule = mongoose.models.TermReportSchedule || mongoose.model('TermReportSchedule', TermReportScheduleSchema);
-export const TermReportSnapshot = mongoose.models.TermReportSnapshot || mongoose.model('TermReportSnapshot', TermReportSnapshotSchema);
+export const TermReport = model('TermReport', TermReportSchema);
+export const TermReportSchedule = model('TermReportSchedule', TermReportScheduleSchema);
+export const TermReportSnapshot = model('TermReportSnapshot', TermReportSnapshotSchema);
 
 
 // Task Kanban Models
@@ -551,13 +680,13 @@ export const TaskListSchema = new Schema({
   order: { type: Number, default: 0 },
   isDefault: { type: Boolean, default: false },
 }, { timestamps: true });
-export const TaskList = mongoose.models.TaskList || mongoose.model('TaskList', TaskListSchema);
+export const TaskList = model('TaskList', TaskListSchema);
 
 export const TaskLabelSchema = new Schema({
   name: { type: String, required: true },
   color: { type: String, default: '#6B7280' },
 }, { timestamps: true });
-export const TaskLabel = mongoose.models.TaskLabel || mongoose.model('TaskLabel', TaskLabelSchema);
+export const TaskLabel = model('TaskLabel', TaskLabelSchema);
 
 export const ChecklistItemSchema = new Schema({
   text: { type: String, required: true },
@@ -573,11 +702,43 @@ export const TaskSchema = new Schema({
   startDate: { type: Date },
   createdAt: { type: Date, default: Date.now },
   listId: { type: Schema.Types.ObjectId, ref: 'TaskList', required: true },
-  requestId: { type: Schema.Types.ObjectId, ref: 'ClientRequest' },
+  requestId: { type: Schema.Types.ObjectId, ref: 'ClientRequest', index: true },
   checklist: [ChecklistItemSchema],
   labelIds: [{ type: Schema.Types.ObjectId, ref: 'TaskLabel' }],
+
+  // Request 360 business attributes
+  clientId: { type: Schema.Types.ObjectId, ref: 'Client', index: true },
+  threadId: { type: Schema.Types.ObjectId, ref: 'RequestThread', index: true },
+  priority: { type: String, enum: Priorities, index: true },
+  severity: { type: String, enum: Severities },
+  ownerIds: { type: [String], default: [], index: true },
+  requestType: { type: String, enum: RequestType },
+  requestKey: { type: String },
+  deadline: { type: Date, index: true },
+  slaState: { type: String, enum: SlaStates },
+  taskType: { type: String, enum: TaskTypes, default: 'other' },
+  tags: { type: [String], default: [] },
+  clientVisible: { type: Boolean, default: false },
 }, { timestamps: true });
-export const Task = mongoose.models.Task || mongoose.model('Task', TaskSchema);
+export const Task = model('Task', TaskSchema);
+
+// Request 360 models (re-exported from the dedicated module)
+export {
+  Counter,
+  RequestEvent,
+  RequestThread,
+  RequestDocument,
+  Deliverable,
+  BusinessCalendar,
+  SlaPolicy,
+  RequestTemplate,
+  CveAdvisory,
+  CveImpact,
+  Notification,
+  AiArtifact,
+  ScheduledFollowUp,
+  NotificationPreference,
+} from './models/request';
 
 // Metric Configuration for Analytics Dashboard
 export const MetricConfigurationSchema = new Schema({
@@ -595,4 +756,4 @@ export const MetricConfigurationSchema = new Schema({
     critical: { type: Number },
   },
 }, { timestamps: true });
-export const MetricConfiguration = mongoose.models.MetricConfiguration || mongoose.model('MetricConfiguration', MetricConfigurationSchema);
+export const MetricConfiguration = model('MetricConfiguration', MetricConfigurationSchema);

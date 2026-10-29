@@ -24,7 +24,7 @@ const CONFIG = {
 
 // Users to create
 const DEFAULT_USERS = [
-  { username: 'admin', email: 'admin@example.com', password: 'admin123', role: 'admin' },
+  { username: 'admin', email: 'admin@infosec.local', password: 'Admin123!@#', role: 'admin' },
   { username: 'manager', email: 'manager@example.com', password: 'manager123', role: 'manager' },
   { username: 'sme', email: 'sme@example.com', password: 'sme123', role: 'sme' }
 ];

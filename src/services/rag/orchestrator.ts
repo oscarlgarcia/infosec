@@ -20,6 +20,7 @@ export interface ChatQueryInput {
   expectedFormat?: string;
   domain?: string;
   subdomain?: string;
+  agent?: string;
 }
 
 export interface ChatQueryOutput {

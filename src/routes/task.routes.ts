@@ -1,4 +1,4 @@
-import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+﻿import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { verifyToken, requireRole } from '../middleware/auth';
 import {
   createTask,
@@ -28,7 +28,7 @@ export async function taskRoutes(fastify: FastifyInstance) {
     try {
       await initializeDefaultLists();
     } catch (err) {
-      fastify.log.error('Error initializing default lists:', err);
+      fastify.log.error({ err }, 'Error initializing default lists:');
     }
   });
 
@@ -82,7 +82,7 @@ export async function taskRoutes(fastify: FastifyInstance) {
     '/tasks',
     { preHandler: [verifyToken, requireRole('admin', 'manager', 'sme')] },
     async (request, reply) => {
-      const task = await createTask(request.body);
+      const task = await createTask(request.body as any);
       return reply.code(201).send(task);
     }
   );

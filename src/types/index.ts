@@ -46,6 +46,8 @@ export interface Client {
   id: string;
   name: string;
   clientType: ClientType;
+  country?: string;
+  contact?: string;
   requestType?: RequestType;
   sectionToReview?: string;
   deadline?: Date;
@@ -81,6 +83,7 @@ export interface Message {
 export interface Conversation {
   id: string;
   clientId: string;
+  requestId?: string;
   title: string;
   agent: string;
   favorite: boolean;

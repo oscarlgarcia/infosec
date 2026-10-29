@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { RequestType, Client } from '../types';
 import { useI18n } from '../i18n/useI18n';
+import { requestsApi } from '../api/requests';
 
 const COUNTRIES = [
   { code: 'ES', name: 'España' },
@@ -59,7 +60,7 @@ interface CreateRequestModalProps {
     deadline?: string;
     owner?: string;
     comments?: string;
-  }) => Promise<void>;
+  }) => Promise<{ id: string } | any>;
   onCreateClient?: (data: { name: string; clientType: string; country?: string; contact?: string }) => Promise<Client>;
 }
 
@@ -117,6 +118,7 @@ export function CreateRequestModal({ clientId, clients = [], isOpen, onClose, on
         contact: '',
       });
       setError(null);
+      setFiles([]);
     }
   }, [isOpen, clientId]);
 
@@ -132,13 +134,21 @@ export function CreateRequestModal({ clientId, clients = [], isOpen, onClose, on
     setError(null);
 
     try {
-      await onSubmit(selectedClientId, {
+      const created = await onSubmit(selectedClientId, {
         requestType: formData.requestType,
         sectionToReview: formData.sectionToReview || undefined,
         deadline: formData.deadline || undefined,
         owner: formData.owner || undefined,
         comments: formData.comments || undefined,
       });
+
+      if (files.length > 0 && created?.id) {
+        await requestsApi.uploadDocuments(
+          created.id,
+          files,
+          files.map(() => ({ documentType: 'other', visibility: 'internal' }))
+        );
+      }
 
       setFormData({
         requestType: '',
@@ -147,6 +157,7 @@ export function CreateRequestModal({ clientId, clients = [], isOpen, onClose, on
         owner: '',
         comments: '',
       });
+      setFiles([]);
       onClose();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Error creating request';

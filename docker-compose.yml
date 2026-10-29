@@ -36,7 +36,9 @@ services:
     volumes:
       - ollama_data:/root/.ollama
     networks:
-      - llm-network
+      llm-network:
+        aliases:
+          - llm-ollama
     environment:
       - OLLAMA_HOST=0.0.0.0
 

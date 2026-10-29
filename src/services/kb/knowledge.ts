@@ -1,4 +1,4 @@
-import * as fs from 'fs/promises';
+﻿import * as fs from 'fs/promises';
 import * as path from 'path';
 import pdf from 'pdf-parse';
 import mammoth from 'mammoth';
@@ -11,6 +11,40 @@ import type { Department, Document as DocType, SearchResult } from '../../types'
 
 const CHROMA_COLLECTION = 'infosec-kb';
 const KNOWLEDGE_UPLOAD_DIR = path.join(process.cwd(), 'uploads', 'knowledge');
+
+const CHUNK_MAX_CHARS = 6000;
+const CHUNK_OVERLAP_CHARS = 600;
+
+function chunkText(text: string, maxChars: number = CHUNK_MAX_CHARS, overlap: number = CHUNK_OVERLAP_CHARS): string[] {
+  if (!text) return [];
+  const cleaned = text.replace(/\r\n/g, '\n').trim();
+  if (cleaned.length === 0) return [];
+  if (cleaned.length <= maxChars) return [cleaned];
+
+  const chunks: string[] = [];
+  let start = 0;
+  while (start < cleaned.length) {
+    let end = Math.min(start + maxChars, cleaned.length);
+    if (end < cleaned.length) {
+      const searchStart = Math.max(start, end - 600);
+      const newlineBreak = cleaned.lastIndexOf('\n', end);
+      const sentenceBreak = Math.max(
+        cleaned.lastIndexOf('. ', end),
+        cleaned.lastIndexOf('; ', end),
+        cleaned.lastIndexOf('): ', end)
+      );
+      const boundary = Math.max(newlineBreak, sentenceBreak);
+      if (boundary > searchStart) {
+        end = boundary + 1;
+      }
+    }
+    const chunk = cleaned.slice(start, end).trim();
+    if (chunk) chunks.push(chunk);
+    if (end >= cleaned.length) break;
+    start = Math.max(start + 1, end - overlap);
+  }
+  return chunks;
+}
 
 export async function parseDocument(
   filePath: string,
@@ -79,20 +113,47 @@ export async function uploadDocument(
   let embedding: number[] = [];
   let embeddingStatus: 'generated' | 'failed' = 'failed';
   let embeddingError: string | null = null;
-  
-  try {
-    console.log('🔄 Creating embedding for document:', originalName, 'Content length:', content.length);
-    embedding = await createProviderEmbedding(content);
-    if (embedding.length > 0) {
+  const entries: Array<{ chunk: string; vector: number[] }> = [];
+  let vectorStoreIds: string[] = [];
+
+  const chunks = chunkText(content);
+  if (chunks.length === 0) {
+    embeddingError = 'Empty content';
+    console.error('âŒ Empty content for document:', originalName);
+  } else {
+    console.log('ðŸ”„ Creating embeddings for document:', originalName, 'chunks:', chunks.length, 'total length:', content.length);
+
+    for (const [i, chunk] of chunks.entries()) {
+      console.log('ðŸ”¹ Embedding chunk', i + 1, 'of', chunks.length, 'length:', chunk.length);
+      try {
+        const vector = await createProviderEmbedding(chunk);
+        if (vector.length > 0) {
+          entries.push({ chunk, vector });
+        } else {
+          console.warn(`âš ï¸ Empty embedding for chunk ${i + 1}`);
+        }
+      } catch (err) {
+        console.warn(`âŒ Failed to embed chunk ${i + 1}:`, err);
+      }
+    }
+
+    if (entries.length > 0) {
+      const dim = entries[0].vector.length;
+      embedding = new Array(dim).fill(0);
+      for (const entry of entries) {
+        for (let d = 0; d < dim; d++) {
+          embedding[d] += entry.vector[d];
+        }
+      }
+      for (let d = 0; d < dim; d++) {
+        embedding[d] /= entries.length;
+      }
       embeddingStatus = 'generated';
-      console.log('✅ Embedding created, vector size:', embedding.length);
+      console.log('âœ… Embeddings created for document:', originalName, 'chunks:', entries.length, 'vector size:', dim);
     } else {
       embeddingError = 'Empty embedding returned';
-      console.error('❌ Empty embedding returned');
+      console.error('âŒ Empty embedding returned');
     }
-  } catch (err: unknown) {
-    embeddingError = err instanceof Error ? err.message : String(err);
-    console.error('❌ Failed to create embedding:', err);
   }
 
   const doc = await DocumentModel.create({
@@ -106,22 +167,46 @@ export async function uploadDocument(
     metadata: {
       size: stats.size,
       mimeType,
+      vectorStoreIds: [],
     },
   });
 
   if (embedding.length > 0) {
+    const docId = doc._id.toString();
+    vectorStoreIds = entries.map((_, i) => `${docId}@chunk${i}`);
+
+    try {
+      await DocumentModel.updateOne(
+        { _id: doc._id },
+        { $set: { 'metadata.vectorStoreIds': vectorStoreIds } }
+      );
+      doc.metadata.vectorStoreIds = vectorStoreIds;
+    } catch (err) {
+      console.warn('âš ï¸ Failed to persist vectorStoreIds:', err);
+    }
+
     try {
       const client = await getChromaClient();
       const collection = await client.getOrCreateCollection({ name: CHROMA_COLLECTION });
       await collection.add({
-        ids: [doc._id.toString()],
-        embeddings: [embedding],
-        documents: [content],
-        metadatas: [{ originalName, department, source: 'document' }],
+        ids: vectorStoreIds,
+        embeddings: entries.map(e => e.vector),
+        documents: entries.map(e => e.chunk),
+        metadatas: entries.map((e, i) => ({
+          originalName,
+          department,
+          source: 'document',
+          docId,
+          chunkIndex: i,
+        })),
       });
-      console.log('✅ Document indexed to ChromaDB:', originalName);
+      console.log('âœ… Document indexed to ChromaDB:', originalName, 'vectors:', vectorStoreIds.length);
+      await DocumentModel.updateOne(
+        { _id: doc._id },
+        { $set: { lastIndexedAt: new Date() } }
+      );
     } catch (err) {
-      console.error('❌ Failed to index document to ChromaDB:', err);
+      console.error('âŒ Failed to index document to ChromaDB:', err);
     }
   }
 
@@ -152,7 +237,7 @@ export async function searchKnowledgeBase(
     queryEmbeddings: [queryEmbedding],
     nResults: limit,
     where: department ? { department } : undefined,
-    include: ['metadatas', 'documents', 'distances']
+    include: ['metadatas', 'documents', 'distances'] as any
   });
 
   const searchResults: SearchResult[] = [];
@@ -195,7 +280,24 @@ export async function getAllDocuments(department?: Department): Promise<DocType[
 }
 
 export async function deleteDocument(id: string): Promise<void> {
+  const doc = await DocumentModel.findById(id);
   await DocumentModel.findByIdAndDelete(id);
+
+  if (!doc) return;
+
+  const staleIds = [
+    id,
+    ...(Array.isArray(doc.metadata?.vectorStoreIds) ? doc.metadata.vectorStoreIds : []),
+  ].filter(Boolean);
+
+  try {
+    const client = await getChromaClient();
+    const collection = await client.getOrCreateCollection({ name: CHROMA_COLLECTION });
+    await collection.delete({ ids: [...new Set(staleIds)] });
+    await collection.delete({ where: { docId: id } }).catch(() => undefined);
+  } catch (err) {
+    console.error('âŒ Failed to delete document vectors from ChromaDB:', err);
+  }
 }
 
 function cosineSimilarity(a: number[], b: number[]): number {
@@ -232,12 +334,12 @@ export async function semanticSearchDocuments(
   try {
     queryEmbedding = await createProviderEmbedding(query);
   } catch (err) {
-    console.error('❌ Failed to create query embedding:', err);
+    console.error('âŒ Failed to create query embedding:', err);
     return [];
   }
   
   if (queryEmbedding.length === 0) {
-    console.warn('⚠️ No query embedding generated');
+    console.warn('âš ï¸ No query embedding generated');
     return [];
   }
 
@@ -300,7 +402,7 @@ export async function semanticSearchDocuments(
       content: { $exists: true, $ne: '' } 
     }).lean() as any[];
     
-    console.log(`🔄 Re-indexing ${docs.length} documents to ChromaDB...`);
+    console.log(`ðŸ”„ Re-indexing ${docs.length} documents to ChromaDB...`);
     
     const client = await getChromaClient();
     const collection = await client.getOrCreateCollection({ name: CHROMA_COLLECTION });
@@ -327,14 +429,25 @@ export async function semanticSearchDocuments(
           continue;
         }
         
+        const chromaIds = validItems.map(item => item.doc._id.toString());
+        const staleIds: string[] = [];
+        for (const item of validItems) {
+          staleIds.push(item.doc._id.toString());
+          if (Array.isArray(item.doc.metadata?.vectorStoreIds)) {
+            staleIds.push(...item.doc.metadata.vectorStoreIds);
+          }
+        }
+        await collection.delete({ ids: [...new Set(staleIds.filter(Boolean))] }).catch(() => undefined);
+
         await collection.add({
-          ids: validItems.map(item => item.doc._id.toString()),
+          ids: chromaIds,
           embeddings: validItems.map(item => item.embedding),
           documents: validItems.map(item => item.content),
           metadatas: validItems.map(item => ({
             originalName: item.doc.originalName || '',
             department: item.doc.department || '',
-            source: 'document'
+            source: 'document',
+            docId: item.doc._id.toString(),
           }))
         });
         
@@ -350,11 +463,11 @@ export async function semanticSearchDocuments(
         await new Promise(r => setTimeout(r, 50));
 
       } catch (err) {
-        console.error(`❌ Failed to index batch starting at ${i}:`, err);
+        console.error(`âŒ Failed to index batch starting at ${i}:`, err);
         failed += batch.length;
       }
     }
     
-    console.log(`✅ Documents reindex complete: ${success} success, ${failed} failed`);
+    console.log(`âœ… Documents reindex complete: ${success} success, ${failed} failed`);
     return { success, failed };
   }

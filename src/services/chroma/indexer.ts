@@ -1,4 +1,4 @@
-import { ChromaClient } from 'chromadb';
+﻿import { ChromaClient } from 'chromadb';
 import { createProviderEmbedding } from '../llm/openai';
 
 const CHROMA_HOST = process.env.CHROMA_HOST || 'chroma';
@@ -206,7 +206,7 @@ export async function getCollectionStats(): Promise<Record<string, number>> {
   
   for (const name of collections) {
     try {
-      const collection = await client.getCollection({ name });
+      const collection = await client.getCollection({ name } as any);
       const result = await collection.get();
       stats[name] = result.ids.length;
     } catch {
