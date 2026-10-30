@@ -138,6 +138,16 @@ async function start() {
         console.error('[Request360] Error starting SLA scheduler:', slaError);
       }
     }
+
+    // Start CVE ingestion scheduler (NVD + CISA KEV)
+    if (env.NVD_SYNC_ENABLED || env.KEV_SYNC_ENABLED) {
+      try {
+        const { startCveScheduler } = await import('./services/cve/scheduler');
+        startCveScheduler();
+      } catch (cveSchedulerError) {
+        console.error('[CVE] Error starting CVE sync scheduler:', cveSchedulerError);
+      }
+    }
     
     // Auto-reindex on startup if enabled in settings
     try {

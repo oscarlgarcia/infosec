@@ -1688,6 +1688,10 @@ fastify.get<{ Querystring: { q: string; topK?: number } }>(
   const { cveRoutes } = await import('./cve.routes');
   fastify.register(cveRoutes);
 
+  // CVE catalog (NVD + CISA KEV), sync controls and client technology inventory
+  const { cveCatalogRoutes } = await import('./cve.catalog.routes');
+  fastify.register(cveCatalogRoutes);
+
   // Dashboards (global, client 360, workload)
   const { dashboardRoutes } = await import('./dashboard.routes');
   fastify.register(dashboardRoutes);

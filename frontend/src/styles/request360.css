@@ -1024,6 +1024,77 @@
   justify-content: center;
 }
 
+/* CVE catalog source blocks ------------------------------------------------ */
+
+.r360-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px 20px;
+  margin: 12px 0;
+}
+
+.r360-info {
+  min-width: 0;
+}
+
+.r360-info-full {
+  grid-column: 1 / -1;
+}
+
+.r360-info-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted, #42526b);
+  margin-bottom: 2px;
+}
+
+.r360-info-value {
+  font-size: 13px;
+  color: var(--text, #111827);
+  word-break: break-word;
+}
+
+.r360-source-block {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid #f1f3f7;
+}
+
+.r360-source-block h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--primary, #1e2954);
+}
+
+.r360-source-summary {
+  margin: 12px 0;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text, #111827);
+}
+
+.r360-ref-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12.5px;
+  line-height: 1.8;
+  word-break: break-word;
+}
+
+.r360-error-text {
+  color: #b42318;
+  font-size: 12.5px;
+  word-break: break-word;
+}
+
+.r360-page .r360-table input,
+.r360-page .r360-table select {
+  min-width: 110px;
+  width: 100%;
+}
+
 /* Responsive --------------------------------------------------------------- */
 
 @media (max-width: 1100px) {

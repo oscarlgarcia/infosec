@@ -1,3 +1,5 @@
+import type { TechnologyInventoryItem } from './request360';
+
 export interface Client {
   id: string;
   name: string;
@@ -5,6 +7,7 @@ export interface Client {
   country?: string;
   contact?: string;
   attachments: Attachment[];
+  technologyInventory?: TechnologyInventoryItem[];
   createdAt: string;
   updatedAt: string;
 }

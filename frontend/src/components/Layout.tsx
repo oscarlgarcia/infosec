@@ -121,6 +121,9 @@ export function Layout({ children, sidebarContent }: LayoutProps) {
       links.push({ path: '/analytics', label: 'Analytics', icon: NAV_ICONS.analytics });
       links.push({ path: '/ask', label: t('chat') || 'Chat', icon: NAV_ICONS.chat });
       links.push({ path: '/cve', label: 'CVE', icon: NAV_ICONS.cve });
+      if (user.role === 'admin') {
+        links.push({ path: '/cve-sync', label: 'CVE Sync', icon: NAV_ICONS.cve });
+      }
     }
 
     if (user.role === 'admin' || user.role === 'manager') {

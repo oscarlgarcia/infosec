@@ -198,6 +198,28 @@ export const cveSubscriptionSchema = z.object({
   recipients: z.array(z.string()).optional(),
 });
 
+export const cveSyncSchema = z.object({
+  mode: z.enum(['incremental', 'backfill', 'full']).optional(),
+  from: z.string().optional(),
+  to: z.string().optional(),
+  force: z.boolean().optional(),
+});
+
+export const technologyInventorySchema = z.object({
+  items: z
+    .array(
+      z.object({
+        vendor: z.string().min(1).max(200),
+        product: z.string().min(1).max(200),
+        version: z.string().max(120).optional(),
+        cpe: z.string().max(500).optional(),
+        criticality: z.enum(['low', 'medium', 'high', 'critical']).optional(),
+        notes: z.string().max(1000).optional(),
+      })
+    )
+    .max(500),
+});
+
 export const notificationPreferencesSchema = z.object({
   inApp: z.boolean().optional(),
   email: z.boolean().optional(),

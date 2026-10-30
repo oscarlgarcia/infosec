@@ -45,6 +45,7 @@ import { Client360Page } from './pages/Client360Page'
 import { DashboardPage } from './pages/DashboardPage'
 import { CveListPage } from './pages/CveListPage'
 import { CveDetailPage } from './pages/CveDetailPage'
+import { CveSyncPage } from './pages/CveSyncPage'
 import { SlaPoliciesPage } from './pages/SlaPoliciesPage'
 import { NotificationsPage } from './pages/NotificationsPage'
 import './styles/request360.css'
@@ -351,6 +352,14 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
               element={
                 <ProtectedRoute>
                   <CveDetailPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/cve-sync"
+              element={
+                <ProtectedRoute>
+                  <CveSyncPage />
                 </ProtectedRoute>
               }
             />

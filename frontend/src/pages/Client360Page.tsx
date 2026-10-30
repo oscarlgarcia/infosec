@@ -2,9 +2,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { useLanguage } from '../i18n/LanguageContext';
+import { useAuth } from '../contexts/AuthContext';
 import { dashboardApi } from '../api/dashboard';
 import { cveApi } from '../api/cve';
-import type { Client360 } from '../types/request360';
+import type { Client360, TechnologyInventoryItem } from '../types/request360';
 import {
   EmptyState,
   ErrorBanner,
@@ -17,25 +18,32 @@ import {
   formatDateTime,
 } from '../components/request360/badges';
 
-type TabKey = 'requests' | 'deliverables' | 'documents' | 'cve' | 'timeline';
+type TabKey = 'requests' | 'deliverables' | 'documents' | 'cve' | 'inventory' | 'timeline';
 
 const TABS: Record<TabKey, { es: string; en: string }> = {
   requests: { es: 'Solicitudes', en: 'Requests' },
   deliverables: { es: 'Entregables', en: 'Deliverables' },
   documents: { es: 'Documentos', en: 'Documents' },
   cve: { es: 'CVE', en: 'CVE' },
+  inventory: { es: 'Inventario tecnológico', en: 'Technology inventory' },
   timeline: { es: 'Actividad', en: 'Activity' },
 };
 
 export function Client360Page() {
   const { id } = useParams<{ id: string }>();
   const { language } = useLanguage();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [data, setData] = useState<Client360 | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<TabKey>('requests');
   const [subscription, setSubscription] = useState<{ enabled: boolean; severityThreshold: string; recipients: string[] } | null>(null);
+  const [inventory, setInventory] = useState<TechnologyInventoryItem[]>([]);
+  const [inventoryBusy, setInventoryBusy] = useState(false);
+  const [inventoryNotice, setInventoryNotice] = useState<string | null>(null);
+
+  const canManage = Boolean(user && ['admin', 'manager', 'sme'].includes(user.role));
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -48,6 +56,10 @@ export function Client360Page() {
         .getSubscription(id)
         .then((sub) => setSubscription({ enabled: sub.enabled, severityThreshold: sub.severityThreshold, recipients: sub.recipients }))
         .catch(() => undefined);
+      cveApi
+        .getTechnologyInventory(id)
+        .then((result) => setInventory(result.items))
+        .catch(() => undefined);
     } catch (err: any) {
       setError(err.message || 'Error');
     } finally {
@@ -58,6 +70,60 @@ export function Client360Page() {
   useEffect(() => {
     load();
   }, [load]);
+
+  const updateInventoryItem = (index: number, patch: Partial<TechnologyInventoryItem>) => {
+    setInventory((items) => items.map((item, position) => (position === index ? { ...item, ...patch } : item)));
+  };
+
+  const addInventoryItem = () => {
+    setInventory((items) => [...items, { vendor: '', product: '', version: '', criticality: 'medium' }]);
+  };
+
+  const removeInventoryItem = (index: number) => {
+    setInventory((items) => items.filter((_, position) => position !== index));
+  };
+
+  const saveInventory = async () => {
+    if (!id) return;
+    setInventoryBusy(true);
+    setInventoryNotice(null);
+    setError(null);
+    try {
+      const cleaned = inventory
+        .filter((item) => item.vendor?.trim() && item.product?.trim())
+        .map((item) => ({ ...item, vendor: item.vendor.trim(), product: item.product.trim() }));
+      const response = await cveApi.updateTechnologyInventory(id, cleaned);
+      setInventory(response.items);
+      setInventoryNotice(
+        language === 'es'
+          ? `Inventario guardado (${response.items.length} elemento(s)). Recalculando coincidencias en segundo plano.`
+          : `Inventory saved (${response.items.length} item(s)). Recomputing matches in the background.`
+      );
+    } catch (err: any) {
+      setError(err.message || 'Error');
+    } finally {
+      setInventoryBusy(false);
+    }
+  };
+
+  const rematchInventory = async () => {
+    if (!id) return;
+    setInventoryBusy(true);
+    setInventoryNotice(null);
+    setError(null);
+    try {
+      const response = await cveApi.rematchClient(id);
+      setInventoryNotice(
+        language === 'es'
+          ? `Recalculadas ${response.changed} de ${response.scanned} CVEs.`
+          : `Recomputed ${response.changed} of ${response.scanned} CVEs.`
+      );
+    } catch (err: any) {
+      setError(err.message || 'Error');
+    } finally {
+      setInventoryBusy(false);
+    }
+  };
 
   if (loading) {
     return <Layout><div className="r360-page"><Loading lang={language} /></div></Layout>;
@@ -136,6 +202,7 @@ export function Client360Page() {
               {key === 'deliverables' && <span className="r360-tab-count">{data.deliverables.length}</span>}
               {key === 'documents' && <span className="r360-tab-count">{data.documents.length}</span>}
               {key === 'cve' && <span className="r360-tab-count">{data.cveImpacts.length}</span>}
+              {key === 'inventory' && <span className="r360-tab-count">{inventory.length}</span>}
             </button>
           ))}
         </div>
@@ -229,6 +296,98 @@ export function Client360Page() {
                   </div>
                 ))}
               </div>
+            )}
+          </div>
+        )}
+
+        {tab === 'inventory' && (
+          <div className="r360-card r360-section">
+            <div className="r360-section-head">
+              <h2>{language === 'es' ? 'Inventario tecnológico' : 'Technology inventory'}</h2>
+              <div className="r360-inline-group">
+                {canManage && (
+                  <>
+                    <button className="r360-btn" disabled={inventoryBusy} onClick={rematchInventory}>
+                      ⟳ {language === 'es' ? 'Recalcular coincidencias' : 'Recompute matches'}
+                    </button>
+                    <button className="r360-btn r360-btn-primary" disabled={inventoryBusy} onClick={saveInventory}>
+                      {language === 'es' ? 'Guardar inventario' : 'Save inventory'}
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <p className="r360-muted">
+              {language === 'es'
+                ? 'El inventario se cruza con el catálogo CVE (CPE, versión y nombre) para proponer impactos. No crea avisos ni envía correos.'
+                : 'The inventory is matched against the CVE catalog (CPE, version and name) to propose impacts. It does not create advisories or send emails.'}
+            </p>
+
+            {inventoryNotice && <div className="r360-success">{inventoryNotice}</div>}
+
+            {inventory.length === 0 ? (
+              <EmptyState
+                icon="🧩"
+                title={language === 'es' ? 'Sin inventario' : 'No inventory'}
+                text={language === 'es' ? 'Añade proveedor, producto y versión para detectar CVEs aplicables.' : 'Add vendor, product and version to detect applicable CVEs.'}
+              />
+            ) : (
+              <div className="r360-table-wrap">
+                <table className="r360-table">
+                  <thead>
+                    <tr>
+                      <th>{language === 'es' ? 'Proveedor' : 'Vendor'}</th>
+                      <th>{language === 'es' ? 'Producto' : 'Product'}</th>
+                      <th>{language === 'es' ? 'Versión' : 'Version'}</th>
+                      <th>CPE</th>
+                      <th>{language === 'es' ? 'Criticidad' : 'Criticality'}</th>
+                      <th>{language === 'es' ? 'Notas' : 'Notes'}</th>
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {inventory.map((item, index) => (
+                      <tr key={item._id || index}>
+                        <td>
+                          <input value={item.vendor} disabled={!canManage} onChange={(event) => updateInventoryItem(index, { vendor: event.target.value })} />
+                        </td>
+                        <td>
+                          <input value={item.product} disabled={!canManage} onChange={(event) => updateInventoryItem(index, { product: event.target.value })} />
+                        </td>
+                        <td>
+                          <input value={item.version || ''} disabled={!canManage} onChange={(event) => updateInventoryItem(index, { version: event.target.value })} />
+                        </td>
+                        <td>
+                          <input className="r360-mono" value={item.cpe || ''} placeholder="cpe:2.3:a:vendor:product:version" disabled={!canManage} onChange={(event) => updateInventoryItem(index, { cpe: event.target.value })} />
+                        </td>
+                        <td>
+                          <select value={item.criticality || 'medium'} disabled={!canManage} onChange={(event) => updateInventoryItem(index, { criticality: event.target.value as any })}>
+                            <option value="low">low</option>
+                            <option value="medium">medium</option>
+                            <option value="high">high</option>
+                            <option value="critical">critical</option>
+                          </select>
+                        </td>
+                        <td>
+                          <input value={item.notes || ''} disabled={!canManage} onChange={(event) => updateInventoryItem(index, { notes: event.target.value })} />
+                        </td>
+                        <td>
+                          {canManage && (
+                            <button className="r360-btn r360-btn-danger" onClick={() => removeInventoryItem(index)}>×</button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {canManage && (
+              <button className="r360-btn" onClick={addInventoryItem}>
+                + {language === 'es' ? 'Añadir elemento' : 'Add item'}
+              </button>
             )}
           </div>
         )}

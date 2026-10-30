@@ -203,6 +203,7 @@ export const RequestTemplateSchema = new Schema({
 
 export const CveAdvisorySchema = new Schema({
   cveId: { type: String, required: true, unique: true, index: true },
+  cveRecordId: { type: objectId, ref: 'CveRecord', index: true },
   title: { type: String, required: true },
   severity: { type: String, enum: Severities, default: 'medium', index: true },
   cvssScore: { type: Number },
@@ -232,6 +233,97 @@ export const CveImpactSchema = new Schema({
 
 CveImpactSchema.index({ cveId: 1, clientId: 1 }, { unique: true });
 CveImpactSchema.index({ clientId: 1, affected: 1 });
+
+/**
+ * Normalized CVE catalog. This is the ingestion target for NVD and CISA KEV;
+ * curated advisories (CveAdvisory) are promoted from these records.
+ */
+const CveKevSchema = new Schema({
+  listed: { type: Boolean, default: false },
+  dateAdded: { type: Date },
+  dueDate: { type: Date },
+  requiredAction: { type: String },
+  vulnerabilityName: { type: String },
+  vendorProject: { type: String },
+  product: { type: String },
+  knownRansomwareCampaignUse: { type: String },
+  notes: { type: String },
+}, { _id: false });
+
+const CveCpeSchema = new Schema({
+  criteria: { type: String },
+  vendor: { type: String },
+  product: { type: String },
+  version: { type: String },
+  versionStartIncluding: { type: String },
+  versionStartExcluding: { type: String },
+  versionEndIncluding: { type: String },
+  versionEndExcluding: { type: String },
+}, { _id: false });
+
+const CveMatchSchema = new Schema({
+  clientId: { type: objectId, ref: 'Client' },
+  confidence: { type: Number, default: 0 },
+  reasons: { type: [String], default: [] },
+  matchedVendor: { type: String },
+  matchedProduct: { type: String },
+  matchedVersion: { type: String },
+}, { _id: false });
+
+export const CveRecordSchema = new Schema({
+  cveId: { type: String, required: true, unique: true, index: true },
+  source: { type: [String], enum: ['nvd', 'kev'], default: [], index: true },
+  title: { type: String, required: true },
+  severity: { type: String, enum: Severities, default: 'medium', index: true },
+  cvssScore: { type: Number },
+  cvssVersion: { type: String },
+  cvssVector: { type: String },
+  summary: { type: String },
+  summaryEs: { type: String },
+  vendors: { type: [String], default: [] },
+  products: { type: [String], default: [] },
+  cpes: { type: [CveCpeSchema], default: [] },
+  cwe: { type: [String], default: [] },
+  references: { type: [String], default: [] },
+  publishedAt: { type: Date, index: true },
+  lastModified: { type: Date },
+  nvdStatus: { type: String, index: true },
+  sourceUrl: { type: String },
+  kev: { type: CveKevSchema, default: () => ({ listed: false }) },
+  matches: { type: [CveMatchSchema], default: [] },
+  advisoryId: { type: objectId, ref: 'CveAdvisory', index: true },
+  firstSeenAt: { type: Date },
+  lastSyncedAt: { type: Date },
+}, { timestamps: true });
+
+CveRecordSchema.index({ severity: 1, publishedAt: -1 });
+CveRecordSchema.index({ 'kev.listed': 1, publishedAt: -1 });
+CveRecordSchema.index({ lastModified: -1 });
+CveRecordSchema.index({ source: 1, publishedAt: -1 });
+CveRecordSchema.index({ 'matches.clientId': 1, publishedAt: -1 });
+
+/**
+ * Durable sync cursor and lock per external source (`nvd`, `kev`).
+ */
+export const CveSyncStateSchema = new Schema({
+  key: { type: String, required: true, unique: true, index: true },
+  status: { type: String, enum: ['idle', 'running', 'error'], default: 'idle', index: true },
+  mode: { type: String, enum: ['incremental', 'backfill', 'full'], default: 'incremental' },
+  lastRunAt: { type: Date },
+  lastSuccessAt: { type: Date },
+  lastError: { type: String },
+  cursorFrom: { type: Date },
+  cursorTo: { type: Date },
+  catalogVersion: { type: String },
+  progress: {
+    page: { type: Number, default: 0 },
+    processed: { type: Number, default: 0 },
+    total: { type: Number, default: 0 },
+    startedAt: { type: Date },
+  },
+  stats: { type: Schema.Types.Mixed, default: {} },
+  lockedAt: { type: Date, index: true },
+}, { timestamps: true });
 
 export const NotificationSchema = new Schema({
   userId: { type: String, required: true, index: true },
@@ -292,6 +384,8 @@ export const SlaPolicy = model('SlaPolicy', SlaPolicySchema);
 export const RequestTemplate = model('RequestTemplate', RequestTemplateSchema);
 export const CveAdvisory = model('CveAdvisory', CveAdvisorySchema);
 export const CveImpact = model('CveImpact', CveImpactSchema);
+export const CveRecord = model('CveRecord', CveRecordSchema);
+export const CveSyncState = model('CveSyncState', CveSyncStateSchema);
 export const Notification = model('Notification', NotificationSchema);
 export const AiArtifact = model('AiArtifact', AiArtifactSchema);
 export const ScheduledFollowUp = model('ScheduledFollowUp', ScheduledFollowUpSchema);

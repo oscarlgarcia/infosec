@@ -4,6 +4,17 @@ import path from 'path';
 
 config({ path: path.join(process.cwd(), '.env') });
 
+/**
+ * `z.coerce.boolean()` treats any non-empty string (including "false") as
+ * true. New feature flags use this parser so `.env` values behave as expected.
+ */
+const booleanEnv = z.preprocess((value) => {
+  if (typeof value === 'string') {
+    return ['1', 'true', 'yes', 'on'].includes(value.trim().toLowerCase());
+  }
+  return value;
+}, z.boolean());
+
 const envSchema = z.object({
   OPENAI_API_KEY: z.string().min(1, 'OPENAI_API_KEY is required'),
   OPENAI_MODEL: z.string().default('gpt-4o'),
@@ -51,6 +62,20 @@ const envSchema = z.object({
   // SLA scheduler
   SLA_SCHEDULER_ENABLED: z.coerce.boolean().default(true),
   SLA_SCHEDULER_INTERVAL_MS: z.coerce.number().default(15 * 60 * 1000),
+
+  // CVE ingestion (NVD + CISA KEV)
+  NVD_API_KEY: z.string().optional(),
+  NVD_API_BASE_URL: z.string().default('https://services.nvd.nist.gov/rest/json/cves/2.0'),
+  NVD_SYNC_ENABLED: booleanEnv.default(true),
+  NVD_SYNC_INTERVAL_MS: z.coerce.number().default(2 * 60 * 60 * 1000),
+  NVD_BACKFILL_START: z.string().default('2026-01-01'),
+  NVD_INGEST_REJECTED: booleanEnv.default(false),
+  NVD_REQUEST_TIMEOUT_MS: z.coerce.number().default(90000),
+  KEV_FEED_URL: z.string().default('https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json'),
+  KEV_SYNC_ENABLED: booleanEnv.default(true),
+  KEV_SYNC_INTERVAL_MS: z.coerce.number().default(6 * 60 * 60 * 1000),
+  CVE_MATCHER_ENABLED: booleanEnv.default(true),
+  CVE_SYNC_START_DELAY_MS: z.coerce.number().default(60000),
 });
 
 export const env = envSchema.parse(process.env);

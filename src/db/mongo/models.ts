@@ -82,6 +82,15 @@ export const StakeholderSchema = new Schema({
   userId: { type: String },
 }, { _id: false });
 
+export const TechnologyInventoryItemSchema = new Schema({
+  vendor: { type: String, required: true },
+  product: { type: String, required: true },
+  version: { type: String },
+  cpe: { type: String },
+  criticality: { type: String, enum: ['low', 'medium', 'high', 'critical'], default: 'medium' },
+  notes: { type: String },
+});
+
 export const ClientSchema = new Schema({
   name: { type: String, required: true },
   clientType: { type: String, enum: ClientType, required: true },
@@ -107,6 +116,7 @@ export const ClientSchema = new Schema({
     severityThreshold: { type: String, enum: Severities, default: 'high' },
     recipients: { type: [String], default: [] },
   },
+  technologyInventory: { type: [TechnologyInventoryItemSchema], default: [] },
   createdBy: { type: String },
   updatedBy: { type: String },
 }, { timestamps: true });
@@ -734,6 +744,8 @@ export {
   RequestTemplate,
   CveAdvisory,
   CveImpact,
+  CveRecord,
+  CveSyncState,
   Notification,
   AiArtifact,
   ScheduledFollowUp,

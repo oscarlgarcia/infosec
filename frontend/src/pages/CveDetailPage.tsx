@@ -6,7 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { cveApi } from '../api/cve';
 import { clientsApi } from '../api/clients';
 import type { Client } from '../types';
-import type { CveAdvisory, CveImpact } from '../types/request360';
+import type { CveAdvisory, CveCpe, CveImpact, CveRecord } from '../types/request360';
 import { SEVERITIES } from '../types/request360';
 import {
   EmptyState,
@@ -19,18 +19,8 @@ import {
 
 const POSTURES = ['not_affected', 'affected', 'under_review', 'mitigated', 'unknown'];
 
-export function CveDetailPage() {
-  const { id } = useParams<{ id: string }>();
-  const { language } = useLanguage();
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const [advisory, setAdvisory] = useState<CveAdvisory | null>(null);
-  const [clients, setClients] = useState<Client[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [form, setForm] = useState({
+function emptyForm() {
+  return {
     title: '',
     severity: 'high',
     cvssScore: '',
@@ -40,7 +30,54 @@ export function CveDetailPage() {
     posture: 'unknown',
     summary: '',
     sourceUrl: '',
-  });
+  };
+}
+
+function formFromAdvisory(advisory: CveAdvisory) {
+  return {
+    title: advisory.title || '',
+    severity: advisory.severity || 'high',
+    cvssScore: advisory.cvssScore !== undefined ? String(advisory.cvssScore) : '',
+    products: (advisory.products || []).join(', '),
+    publishedAt: advisory.publishedAt ? String(advisory.publishedAt).slice(0, 10) : '',
+    status: advisory.status || 'draft',
+    posture: advisory.posture || 'unknown',
+    summary: advisory.summary || '',
+    sourceUrl: advisory.sourceUrl || '',
+  };
+}
+
+function cpeRange(cpe: CveCpe): string {
+  if (cpe.versionStartIncluding || cpe.versionStartExcluding || cpe.versionEndIncluding || cpe.versionEndExcluding) {
+    const start = cpe.versionStartIncluding
+      ? `>= ${cpe.versionStartIncluding}`
+      : cpe.versionStartExcluding
+        ? `> ${cpe.versionStartExcluding}`
+        : '';
+    const end = cpe.versionEndIncluding
+      ? `<= ${cpe.versionEndIncluding}`
+      : cpe.versionEndExcluding
+        ? `< ${cpe.versionEndExcluding}`
+        : '';
+    return [start, end].filter(Boolean).join(' · ');
+  }
+  return cpe.version || '*';
+}
+
+export function CveDetailPage() {
+  const { id } = useParams<{ id: string }>();
+  const { language } = useLanguage();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [advisory, setAdvisory] = useState<CveAdvisory | null>(null);
+  const [record, setRecord] = useState<CveRecord | null>(null);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [form, setForm] = useState(emptyForm());
   const [impactForm, setImpactForm] = useState({
     clientId: '',
     affected: false,
@@ -59,24 +96,44 @@ export function CveDetailPage() {
     if (!id) return;
     setLoading(true);
     setError(null);
+    setSaved(false);
+    setAdvisory(null);
+    setRecord(null);
     try {
-      const response = await cveApi.get(id);
-      setAdvisory(response);
-      setForm({
-        title: response.title || '',
-        severity: response.severity || 'high',
-        cvssScore: response.cvssScore !== undefined ? String(response.cvssScore) : '',
-        products: (response.products || []).join(', '),
-        publishedAt: response.publishedAt ? String(response.publishedAt).slice(0, 10) : '',
-        status: response.status || 'draft',
-        posture: response.posture || 'unknown',
-        summary: response.summary || '',
-        sourceUrl: response.sourceUrl || '',
-      });
+      if (/^CVE-/i.test(id)) {
+        const catalogRecord = await cveApi.catalogRecord(id);
+        setRecord(catalogRecord);
+        if (catalogRecord.advisory) {
+          const linked: CveAdvisory = { ...catalogRecord.advisory, impacts: catalogRecord.impacts || [] };
+          setAdvisory(linked);
+          setForm(formFromAdvisory(linked));
+        } else {
+          await loadLooseAdvisory(catalogRecord.cveId);
+        }
+      } else {
+        const response = await cveApi.get(id);
+        setAdvisory(response);
+        setForm(formFromAdvisory(response));
+        const recordKey = response.cveRecordId || (/^CVE-/i.test(response.cveId) ? response.cveId : null);
+        if (recordKey) {
+          cveApi.catalogRecord(recordKey).then(setRecord).catch(() => undefined);
+        }
+      }
     } catch (err: any) {
       setError(err.message || 'Error');
     } finally {
       setLoading(false);
+    }
+
+    async function loadLooseAdvisory(cveId: string) {
+      try {
+        const response = await cveApi.get(cveId);
+        setAdvisory(response);
+        setForm(formFromAdvisory(response));
+      } catch {
+        setAdvisory(null);
+        setForm(emptyForm());
+      }
     }
   }, [id]);
 
@@ -88,6 +145,7 @@ export function CveDetailPage() {
   const run = async (action: () => Promise<any>, reload = true) => {
     setBusy(true);
     setError(null);
+    setNotice(null);
     try {
       await action();
       if (reload) await load();
@@ -99,10 +157,10 @@ export function CveDetailPage() {
   };
 
   const save = async () => {
-    if (!id) return;
+    if (!advisory) return;
     setSaved(false);
     await run(async () => {
-      await cveApi.update(id, {
+      await cveApi.update(advisory._id, {
         title: form.title,
         severity: form.severity,
         cvssScore: form.cvssScore ? Number(form.cvssScore) : undefined,
@@ -118,9 +176,9 @@ export function CveDetailPage() {
   };
 
   const addImpact = async () => {
-    if (!id || !impactForm.clientId) return;
+    if (!advisory || !impactForm.clientId) return;
     await run(async () => {
-      await cveApi.upsertImpact(id, {
+      await cveApi.upsertImpact(advisory._id, {
         clientId: impactForm.clientId,
         affected: impactForm.affected,
         posture: impactForm.posture,
@@ -132,11 +190,11 @@ export function CveDetailPage() {
   };
 
   const generateDraft = async () => {
-    if (!id || !draftForm.clientId) return;
+    if (!advisory || !draftForm.clientId) return;
     setBusy(true);
     setError(null);
     try {
-      const response = await cveApi.draft(id, { clientId: draftForm.clientId, tone: draftForm.tone });
+      const response = await cveApi.draft(advisory._id, { clientId: draftForm.clientId, tone: draftForm.tone });
       setDraft({ clientId: response.clientId, tone: response.tone, content: response.content, model: response.model });
     } catch (err: any) {
       setError(err.message || 'Error');
@@ -145,11 +203,44 @@ export function CveDetailPage() {
     }
   };
 
+  const promote = async () => {
+    if (!record) return;
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const result = await cveApi.promote(record.cveId);
+      setNotice(
+        language === 'es'
+          ? `Aviso ${result.created ? 'creado' : 'existente'} con ${result.impacts} impacto(s) auto-detectado(s).`
+          : `Advisory ${result.created ? 'created' : 'found'} with ${result.impacts} auto-detected impact(s).`
+      );
+      navigate(`/cve/${result.advisory._id}`);
+    } catch (err: any) {
+      setError(err.message || 'Error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const rematch = async () => {
+    if (!record) return;
+    await run(async () => {
+      const response = await cveApi.rematchRecord(record.cveId);
+      setRecord((current) => (current ? { ...current, matches: response.items } : current));
+      setNotice(
+        language === 'es'
+          ? `Recalculadas ${response.items.length} coincidencia(s).`
+          : `Recomputed ${response.items.length} match(es).`
+      );
+    }, false);
+  };
+
   if (loading) {
     return <Layout><div className="r360-page"><Loading lang={language} /></div></Layout>;
   }
 
-  if (!advisory) {
+  if (!advisory && !record) {
     return (
       <Layout>
         <div className="r360-page">
@@ -160,7 +251,14 @@ export function CveDetailPage() {
     );
   }
 
-  const impacts: CveImpact[] = advisory.impacts || [];
+  const cveId = record?.cveId || advisory?.cveId || '';
+  const severity = record?.severity || advisory?.severity || 'medium';
+  const title = advisory?.title || record?.title || cveId;
+  const cvssScore = advisory?.cvssScore ?? record?.cvssScore;
+  const publishedAt = advisory?.publishedAt || record?.publishedAt;
+  const products = advisory?.products?.length ? advisory.products : record?.products || [];
+  const impacts: CveImpact[] = advisory?.impacts || record?.impacts || [];
+  const matches = record?.matches || [];
 
   return (
     <Layout>
@@ -168,20 +266,30 @@ export function CveDetailPage() {
         <div className="r360-page-header">
           <div>
             <div className="r360-detail-topline">
-              <span className="r360-mono r360-key">{advisory.cveId}</span>
-              <SeverityBadge severity={advisory.severity} lang={language} />
-              <span className="r360-badge r360-status-new">{advisory.status || 'draft'}</span>
-              {advisory.cvssScore !== undefined && <span className="r360-badge r360-severity-high">CVSS {advisory.cvssScore}</span>}
+              <span className="r360-mono r360-key">{cveId}</span>
+              <SeverityBadge severity={severity} lang={language} />
+              {record?.kev?.listed && <span className="r360-badge r360-severity-critical">KEV</span>}
+              {/known/i.test(record?.kev?.knownRansomwareCampaignUse || '') && (
+                <span className="r360-badge r360-severity-high">Ransomware</span>
+              )}
+              {advisory && <span className="r360-badge r360-status-new">{advisory.status || 'draft'}</span>}
+              {cvssScore !== undefined && <span className="r360-badge r360-severity-high">CVSS {cvssScore}</span>}
+              {!advisory && <span className="r360-badge r360-status-closed">{language === 'es' ? 'Sin aviso' : 'No advisory'}</span>}
             </div>
-            <h1>{advisory.title}</h1>
+            <h1>{title}</h1>
             <p className="r360-subtitle">
-              {language === 'es' ? 'Publicado' : 'Published'} {formatDate(advisory.publishedAt, language)}
-              {advisory.products?.length ? ` · ${advisory.products.join(', ')}` : ''}
+              {language === 'es' ? 'Publicado' : 'Published'} {formatDate(publishedAt, language)}
+              {products.length ? ` · ${products.slice(0, 4).join(', ')}` : ''}
             </p>
           </div>
           <div className="r360-header-actions">
             <button className="r360-btn" onClick={() => navigate('/cve')}>← CVE</button>
-            {canNotify && (
+            {!advisory && canManage && (
+              <button className="r360-btn r360-btn-primary" disabled={busy} onClick={promote}>
+                + {language === 'es' ? 'Crear aviso' : 'Create advisory'}
+              </button>
+            )}
+            {advisory && canNotify && (
               <button
                 className="r360-btn r360-btn-primary"
                 disabled={busy}
@@ -190,12 +298,12 @@ export function CveDetailPage() {
                 ✉️ {language === 'es' ? 'Notificar suscriptores' : 'Notify subscribers'}
               </button>
             )}
-            {isAdmin && (
+            {advisory && isAdmin && (
               <button
                 className="r360-btn r360-btn-danger"
                 disabled={busy}
                 onClick={() => {
-                  if (!window.confirm(language === 'es' ? '¿Eliminar este CVE?' : 'Delete this CVE?')) return;
+                  if (!window.confirm(language === 'es' ? '¿Eliminar este aviso?' : 'Delete this advisory?')) return;
                   run(async () => {
                     await cveApi.remove(advisory._id);
                     navigate('/cve');
@@ -210,10 +318,151 @@ export function CveDetailPage() {
 
         <ErrorBanner error={error} />
         {saved && <div className="r360-success">{language === 'es' ? 'Cambios guardados' : 'Changes saved'}</div>}
+        {notice && <div className="r360-success">{notice}</div>}
 
-        {canManage && (
+        {record && (
           <div className="r360-card r360-section">
-            <div className="r360-section-head"><h2>{language === 'es' ? 'Datos del CVE' : 'CVE details'}</h2></div>
+            <div className="r360-section-head">
+              <h2>{language === 'es' ? 'Datos de la fuente (NVD / CISA KEV)' : 'Source data (NVD / CISA KEV)'}</h2>
+              <div className="r360-inline-group">
+                {(record.source || []).map((source) => (
+                  <span key={source} className="r360-badge r360-status-new">{source.toUpperCase()}</span>
+                ))}
+                {record.nvdStatus && <span className="r360-badge r360-status-closed">{record.nvdStatus}</span>}
+              </div>
+            </div>
+
+            <div className="r360-info-grid">
+              <Info label="CVSS" value={cvssScore !== undefined ? `${cvssScore}${record.cvssVersion ? ` (v${record.cvssVersion})` : ''}` : '—'} />
+              <Info label="CWE" value={record.cwe?.length ? record.cwe.join(', ') : '—'} />
+              <Info label={language === 'es' ? 'Proveedores' : 'Vendors'} value={record.vendors?.length ? record.vendors.join(', ') : '—'} />
+              <Info label={language === 'es' ? 'Publicado' : 'Published'} value={formatDate(record.publishedAt, language)} />
+              <Info label={language === 'es' ? 'Última modificación' : 'Last modified'} value={formatDate(record.lastModified, language)} />
+              <Info label={language === 'es' ? 'Última sincronización' : 'Last sync'} value={formatDateTime(record.lastSyncedAt, language)} />
+              {record.cvssVector && <Info label="Vector" value={record.cvssVector} mono full />}
+            </div>
+
+            {(record.summary || record.summaryEs) && (
+              <p className="r360-source-summary">{language === 'es' ? record.summaryEs || record.summary : record.summary}</p>
+            )}
+
+            {record.kev?.listed && (
+              <div className="r360-source-block">
+                <h3>{language === 'es' ? 'CISA KEV' : 'CISA KEV'}</h3>
+                <div className="r360-info-grid">
+                  <Info label={language === 'es' ? 'Añadido' : 'Added'} value={formatDate(record.kev.dateAdded, language)} />
+                  <Info label={language === 'es' ? 'Acción antes de' : 'Action due'} value={formatDate(record.kev.dueDate, language)} />
+                  <Info label="Ransomware" value={record.kev.knownRansomwareCampaignUse || '—'} />
+                  <Info label={language === 'es' ? 'Producto' : 'Product'} value={[record.kev.vendorProject, record.kev.product].filter(Boolean).join(' ') || '—'} />
+                  {record.kev.requiredAction && <Info label={language === 'es' ? 'Acción requerida' : 'Required action'} value={record.kev.requiredAction} full />}
+                  {record.kev.notes && <Info label="Notes" value={record.kev.notes} full />}
+                </div>
+              </div>
+            )}
+
+            <div className="r360-source-block">
+              <h3>
+                {language === 'es' ? 'CPEs afectados' : 'Affected CPEs'}{' '}
+                <span className="r360-muted">({record.cpes?.length || 0})</span>
+              </h3>
+              {!record.cpes?.length ? (
+                <p className="r360-muted">{language === 'es' ? 'Sin CPEs publicados.' : 'No CPEs published.'}</p>
+              ) : (
+                <div className="r360-table-wrap">
+                  <table className="r360-table">
+                    <thead>
+                      <tr>
+                        <th>{language === 'es' ? 'Proveedor' : 'Vendor'}</th>
+                        <th>{language === 'es' ? 'Producto' : 'Product'}</th>
+                        <th>{language === 'es' ? 'Rango' : 'Range'}</th>
+                        <th>CPE</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {record.cpes.map((cpe) => (
+                        <tr key={`${cpe.criteria}-${cpe.versionStartIncluding || ''}-${cpe.versionEndExcluding || ''}`}>
+                          <td>{cpe.vendor}</td>
+                          <td>{cpe.product}</td>
+                          <td><span className="r360-mono">{cpeRange(cpe)}</span></td>
+                          <td><span className="r360-mono r360-muted">{cpe.criteria}</span></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {record.references?.length > 0 && (
+              <div className="r360-source-block">
+                <h3>{language === 'es' ? 'Referencias' : 'References'}</h3>
+                <ul className="r360-ref-list">
+                  {record.references.map((reference) => (
+                    <li key={reference}>
+                      <a className="r360-link" href={reference} target="_blank" rel="noreferrer">{reference}</a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {record.sourceUrl && (
+              <p className="r360-muted">
+                <a className="r360-link" href={record.sourceUrl} target="_blank" rel="noreferrer">
+                  {language === 'es' ? 'Ver ficha original' : 'View source record'} ↗
+                </a>
+              </p>
+            )}
+          </div>
+        )}
+
+        {record && (
+          <div className="r360-card r360-section">
+            <div className="r360-section-head">
+              <h2>{language === 'es' ? 'Coincidencias con clientes' : 'Client matches'}</h2>
+              <div className="r360-inline-group">
+                <span className="r360-muted">{matches.length}</span>
+                {canManage && (
+                  <button className="r360-btn" disabled={busy} onClick={rematch}>
+                    ⟳ {language === 'es' ? 'Recalcular' : 'Recompute'}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {matches.length === 0 ? (
+              <EmptyState
+                icon="🔍"
+                title={language === 'es' ? 'Sin coincidencias' : 'No matches'}
+                text={language === 'es' ? 'Añade inventario tecnológico al cliente para detectar impacto.' : 'Add a client technology inventory to detect impact.'}
+              />
+            ) : (
+              <div className="r360-doc-list">
+                {matches.map((match, index) => {
+                  const client: any = match.clientId;
+                  const name = client && typeof client === 'object' ? client.name : null;
+                  const clientKey = client && typeof client === 'object' ? client._id : client;
+                  return (
+                    <div key={`${clientKey || name || index}`} className="r360-doc-row">
+                      <div>
+                        <strong>{name || String(clientKey || '—')}</strong>
+                        <div className="r360-muted">{match.reasons?.join(' · ')}</div>
+                      </div>
+                      <div className="r360-inline-group">
+                        <span className="r360-badge r360-status-new">{Math.round((match.confidence || 0) * 100)}%</span>
+                        {clientKey && <Link className="r360-btn" to={`/clients/${clientKey}`}>{language === 'es' ? 'Ver cliente' : 'View client'}</Link>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {advisory && canManage && (
+          <div className="r360-card r360-section">
+            <div className="r360-section-head"><h2>{language === 'es' ? 'Datos del aviso' : 'Advisory details'}</h2></div>
             <div className="r360-form-grid">
               <label className="r360-field r360-field-full">
                 <span>{language === 'es' ? 'Título' : 'Title'}</span>
@@ -222,7 +471,7 @@ export function CveDetailPage() {
               <label className="r360-field">
                 <span>{language === 'es' ? 'Severidad' : 'Severity'}</span>
                 <select value={form.severity} onChange={(event) => setForm((c) => ({ ...c, severity: event.target.value }))}>
-                  {SEVERITIES.map((severity) => <option key={severity} value={severity}>{severity}</option>)}
+                  {SEVERITIES.map((item) => <option key={item} value={item}>{item}</option>)}
                 </select>
               </label>
               <label className="r360-field">
@@ -240,7 +489,7 @@ export function CveDetailPage() {
               <label className="r360-field">
                 <span>Posture</span>
                 <select value={form.posture} onChange={(event) => setForm((c) => ({ ...c, posture: event.target.value }))}>
-                  {POSTURES.map((posture) => <option key={posture} value={posture}>{posture}</option>)}
+                  {POSTURES.map((item) => <option key={item} value={item}>{item}</option>)}
                 </select>
               </label>
               <label className="r360-field">
@@ -272,7 +521,7 @@ export function CveDetailPage() {
             <span className="r360-muted">{impacts.length}</span>
           </div>
 
-          {canManage && (
+          {advisory && canManage && (
             <div className="r360-inline-group r360-create-row">
               <select value={impactForm.clientId} onChange={(event) => setImpactForm((c) => ({ ...c, clientId: event.target.value }))}>
                 <option value="">{language === 'es' ? 'Selecciona cliente' : 'Select client'}</option>
@@ -283,7 +532,7 @@ export function CveDetailPage() {
                 {language === 'es' ? 'Afectado' : 'Affected'}
               </label>
               <select value={impactForm.posture} onChange={(event) => setImpactForm((c) => ({ ...c, posture: event.target.value }))}>
-                {POSTURES.map((posture) => <option key={posture} value={posture}>{posture}</option>)}
+                {POSTURES.map((item) => <option key={item} value={item}>{item}</option>)}
               </select>
               <input
                 placeholder={language === 'es' ? 'Razonamiento' : 'Rationale'}
@@ -301,7 +550,11 @@ export function CveDetailPage() {
           )}
 
           {impacts.length === 0 ? (
-            <EmptyState icon="🏢" title={language === 'es' ? 'Sin impactos registrados' : 'No impacts registered'} />
+            <EmptyState
+              icon="🏢"
+              title={language === 'es' ? 'Sin impactos registrados' : 'No impacts registered'}
+              text={advisory ? undefined : (language === 'es' ? 'Crea un aviso para materializar los impactos auto-detectados.' : 'Create an advisory to materialize auto-detected impacts.')}
+            />
           ) : (
             <div className="r360-doc-list">
               {impacts.map((impact) => {
@@ -330,7 +583,7 @@ export function CveDetailPage() {
           )}
         </div>
 
-        {canManage && (
+        {advisory && canManage && (
           <div className="r360-card r360-section">
             <div className="r360-section-head"><h2>{language === 'es' ? 'Borrador de comunicación IA' : 'AI communication draft'}</h2></div>
             <div className="r360-inline-group r360-create-row">
@@ -360,5 +613,14 @@ export function CveDetailPage() {
         )}
       </div>
     </Layout>
+  );
+}
+
+function Info({ label, value, mono, full }: { label: string; value?: string; mono?: boolean; full?: boolean }) {
+  return (
+    <div className={`r360-info ${full ? 'r360-info-full' : ''}`}>
+      <div className="r360-info-label">{label}</div>
+      <div className={`r360-info-value ${mono ? 'r360-mono' : ''}`}>{value || '—'}</div>
+    </div>
   );
 }

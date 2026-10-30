@@ -1,5 +1,13 @@
 import { apiRequest } from './client';
-import type { CveAdvisory, CveImpact } from '../types/request360';
+import type {
+  CveAdvisory,
+  CveCatalogResponse,
+  CveImpact,
+  CveMatch,
+  CveRecord,
+  CveSyncStatus,
+  TechnologyInventoryItem,
+} from '../types/request360';
 
 export interface CveListResponse {
   items: CveAdvisory[];
@@ -70,5 +78,92 @@ export const cveApi = {
         affected: filters.affected === undefined ? undefined : String(filters.affected),
       },
     });
+  },
+
+  catalog(filters: {
+    q?: string;
+    severity?: string;
+    kev?: boolean;
+    ransomware?: boolean;
+    vendor?: string;
+    product?: string;
+    hasAdvisory?: boolean;
+    matchedClientId?: string;
+    publishedFrom?: string;
+    publishedTo?: string;
+    page?: number;
+    limit?: number;
+    sort?: string;
+  } = {}) {
+    return apiRequest<CveCatalogResponse>('/cve-catalog', {
+      query: {
+        q: filters.q,
+        severity: filters.severity,
+        kev: filters.kev === undefined ? undefined : String(filters.kev),
+        ransomware: filters.ransomware === undefined ? undefined : String(filters.ransomware),
+        vendor: filters.vendor,
+        product: filters.product,
+        hasAdvisory: filters.hasAdvisory === undefined ? undefined : String(filters.hasAdvisory),
+        matchedClientId: filters.matchedClientId,
+        publishedFrom: filters.publishedFrom,
+        publishedTo: filters.publishedTo,
+        page: filters.page,
+        limit: filters.limit,
+        sort: filters.sort,
+      },
+    });
+  },
+
+  catalogRecord(cveId: string) {
+    return apiRequest<CveRecord>(`/cve-catalog/${cveId}`);
+  },
+
+  promote(cveId: string) {
+    return apiRequest<{ advisory: CveAdvisory; created: boolean; impacts: number }>(
+      `/cve-catalog/${cveId}/promote`,
+      { method: 'POST' }
+    );
+  },
+
+  rematchRecord(cveId: string) {
+    return apiRequest<{ items: CveMatch[] }>(`/cve-catalog/${cveId}/match`, { method: 'POST' });
+  },
+
+  syncStatus() {
+    return apiRequest<CveSyncStatus>('/cve-sync/status');
+  },
+
+  syncNvd(payload: { mode?: string; from?: string; to?: string } = {}) {
+    return apiRequest<{ started: boolean; source: string; mode: string }>('/cve-sync/nvd', {
+      method: 'POST',
+      json: payload,
+    });
+  },
+
+  syncKev(payload: { force?: boolean } = {}) {
+    return apiRequest<{ started: boolean; source: string }>('/cve-sync/kev', {
+      method: 'POST',
+      json: payload,
+    });
+  },
+
+  getTechnologyInventory(clientId: string) {
+    return apiRequest<{ clientId: string; name: string; items: TechnologyInventoryItem[] }>(
+      `/clients/${clientId}/technology-inventory`
+    );
+  },
+
+  updateTechnologyInventory(clientId: string, items: TechnologyInventoryItem[]) {
+    return apiRequest<{ clientId: string; name: string; items: TechnologyInventoryItem[]; rematchStarted?: boolean }>(
+      `/clients/${clientId}/technology-inventory`,
+      { method: 'PUT', json: { items } }
+    );
+  },
+
+  rematchClient(clientId: string) {
+    return apiRequest<{ clientId: string; scanned: number; changed: number }>(
+      `/clients/${clientId}/technology-inventory/rematch`,
+      { method: 'POST' }
+    );
   },
 };

@@ -325,6 +325,8 @@ export interface SlaSnapshot {
 export interface CveAdvisory {
   _id: string;
   cveId: string;
+  cveRecordId?: string;
+  cveRecord?: CveRecord | null;
   title: string;
   severity: Severity;
   cvssScore?: number;
@@ -340,6 +342,114 @@ export interface CveAdvisory {
   updatedAt?: string;
   impacts?: CveImpact[];
 }
+
+export interface CveKevData {
+  listed: boolean;
+  dateAdded?: string;
+  dueDate?: string;
+  requiredAction?: string;
+  vulnerabilityName?: string;
+  vendorProject?: string;
+  product?: string;
+  knownRansomwareCampaignUse?: string;
+  notes?: string;
+}
+
+export interface CveCpe {
+  criteria: string;
+  vendor: string;
+  product: string;
+  version?: string;
+  versionStartIncluding?: string;
+  versionStartExcluding?: string;
+  versionEndIncluding?: string;
+  versionEndExcluding?: string;
+}
+
+export interface CveMatch {
+  clientId: any;
+  confidence: number;
+  reasons: string[];
+  matchedVendor?: string;
+  matchedProduct?: string;
+  matchedVersion?: string;
+}
+
+export interface CveRecord {
+  _id: string;
+  cveId: string;
+  source: string[];
+  title: string;
+  severity: Severity;
+  cvssScore?: number;
+  cvssVersion?: string;
+  cvssVector?: string;
+  summary?: string;
+  summaryEs?: string;
+  vendors: string[];
+  products: string[];
+  cpes?: CveCpe[];
+  cwe: string[];
+  references: string[];
+  publishedAt?: string;
+  lastModified?: string;
+  nvdStatus?: string;
+  sourceUrl?: string;
+  kev?: CveKevData;
+  matches: CveMatch[];
+  advisoryId?: string;
+  advisory?: CveAdvisory | null;
+  impacts?: CveImpact[];
+  firstSeenAt?: string;
+  lastSyncedAt?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface CveCatalogResponse {
+  items: CveRecord[];
+  total: number;
+  page: number;
+  limit: number;
+  hasMore: boolean;
+}
+
+export interface CveSyncState {
+  key: 'nvd' | 'kev';
+  status: 'idle' | 'running' | 'error';
+  mode: string;
+  lastRunAt?: string;
+  lastSuccessAt?: string;
+  lastError?: string;
+  cursorFrom?: string;
+  cursorTo?: string;
+  catalogVersion?: string;
+  progress?: { page: number; processed: number; total: number; startedAt?: string };
+  stats?: Record<string, any>;
+}
+
+export interface CveSyncStatus {
+  states: CveSyncState[];
+  running: string[];
+  catalog: { records: number; kevListed: number; advisories: number; matched: number };
+  config: {
+    nvdIntervalMs: number;
+    kevIntervalMs: number;
+    backfillStart: string;
+    matcherEnabled: boolean;
+  };
+}
+
+export interface TechnologyInventoryItem {
+  _id?: string;
+  vendor: string;
+  product: string;
+  version?: string;
+  cpe?: string;
+  criticality?: 'low' | 'medium' | 'high' | 'critical';
+  notes?: string;
+}
+
 
 export interface CveImpact {
   _id: string;

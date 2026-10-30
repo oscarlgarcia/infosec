@@ -26,6 +26,7 @@ export interface CreateAdvisoryInput {
   status?: string;
   sourceUrl?: string;
   communicationTemplate?: string;
+  cveRecordId?: string;
 }
 
 export async function listAdvisories(filters: { severity?: string; status?: string; q?: string; page?: number; limit?: number } = {}) {
@@ -65,6 +66,7 @@ export async function createAdvisory(data: CreateAdvisoryInput, actor?: RequestA
 
   return CveAdvisory.create({
     cveId,
+    cveRecordId: data.cveRecordId && mongoose.Types.ObjectId.isValid(data.cveRecordId) ? data.cveRecordId : undefined,
     title: data.title,
     severity: data.severity || 'medium',
     cvssScore: data.cvssScore,
