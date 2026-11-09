@@ -41,6 +41,7 @@ import { OrchestratorJobs } from './pages/OrchestratorJobs'
 import { RequestsPage } from './pages/RequestsPage'
 import { RequestNewPage } from './pages/RequestNewPage'
 import { RequestDetailPage } from './pages/RequestDetailPage'
+import { ClientsPage } from './pages/ClientsPage'
 import { Client360Page } from './pages/Client360Page'
 import { DashboardPage } from './pages/DashboardPage'
 import { CveListPage } from './pages/CveListPage'
@@ -324,7 +325,23 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
               }
             />
             <Route
+              path="/clients"
+              element={
+                <ProtectedRoute>
+                  <ClientsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/clients/:id"
+              element={
+                <ProtectedRoute>
+                  <Client360Page />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/clients/:id/:tab"
               element={
                 <ProtectedRoute>
                   <Client360Page />

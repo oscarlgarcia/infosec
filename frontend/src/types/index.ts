@@ -8,6 +8,18 @@ export interface Client {
   contact?: string;
   attachments: Attachment[];
   technologyInventory?: TechnologyInventoryItem[];
+  customerStatus?: string;
+  currentPhase?: string;
+  contractSigned?: boolean;
+  contractType?: string;
+  serviceModel?: string;
+  businessUnit?: string;
+  tags?: string[];
+  salesOwnerId?: string;
+  clientOwnerId?: string;
+  infosecOwnerId?: string;
+  stakeholders?: any[];
+  cveSubscriptions?: any;
   createdAt: string;
   updatedAt: string;
 }
@@ -21,6 +33,7 @@ export type RequestType =
   | 'BC/DR Test Result Request'
   | 'Cloud Customer PT Request'
   | 'Certification Request'
+  | 'Document Request'
   | 'Other Support'
   | 'Answer Builder';
 

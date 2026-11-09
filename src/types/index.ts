@@ -54,6 +54,19 @@ export interface Client {
   owner?: string;
   comments?: string;
   attachments: Attachment[];
+  customerStatus?: string;
+  currentPhase?: string;
+  contractSigned?: boolean;
+  contractType?: string;
+  serviceModel?: string;
+  businessUnit?: string;
+  tags?: string[];
+  salesOwnerId?: string;
+  clientOwnerId?: string;
+  infosecOwnerId?: string;
+  stakeholders?: any[];
+  cveSubscriptions?: any;
+  technologyInventory?: any[];
   createdAt: Date;
   updatedAt: Date;
 }

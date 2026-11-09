@@ -34,6 +34,7 @@ const NAV_ICONS = {
   requests: <svg viewBox="0 0 20 20" fill="currentColor" width={20} height={20}><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/><path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd"/></svg>,
   cve: <svg viewBox="0 0 20 20" fill="currentColor" width={20} height={20}><path fillRule="evenodd" d="M10 1.944A11.954 11.954 0 012.166 5C2.056 5.649 2 6.319 2 7c0 5.225 3.34 9.67 8 11.317C14.66 16.67 18 12.225 18 7c0-.682-.057-1.35-.166-2.001A11.954 11.954 0 0110 1.944zM11 14a1 1 0 11-2 0 1 1 0 012 0zm0-7a1 1 0 10-2 0v3a1 1 0 102 0V7z" clipRule="evenodd"/></svg>,
   sla: <svg viewBox="0 0 20 20" fill="currentColor" width={20} height={20}><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd"/></svg>,
+  clients: <svg viewBox="0 0 20 20" fill="currentColor" width={20} height={20}><path d="M4 3a1 1 0 00-1 1v12a1 1 0 001 1h4v-4h2v4h4a1 1 0 001-1V8l-5-5H4zm3 3h2v2H7V6zm0 4h2v2H7v-2zm6-4h2v2h-2V6zm0 4h2v2h-2v-2z"/></svg>,
   notifications: <svg viewBox="0 0 20 20" fill="currentColor" width={20} height={20}><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/></svg>,
 };
 
@@ -44,9 +45,13 @@ export function Layout({ children, sidebarContent }: LayoutProps) {
   const homePath = isAuthenticated ? '/app' : '/';
   const [isNavOpen, setIsNavOpen] = useState(false);
   const [isKcOpen, setIsKcOpen] = useState(location.pathname.startsWith('/knowledge-center'));
+  const [isClient360Open, setIsClient360Open] = useState(
+    ['/clients', '/requests', '/cve', '/sla-policies'].some((path) => location.pathname.startsWith(path))
+  );
   const [unreadNotifications, setUnreadNotifications] = useState(0);
 
-  const isActive = (path: string) => location.pathname === path;
+  const isActive = (path: string) =>
+    location.pathname === path || (path !== '/app' && location.pathname.startsWith(`${path}/`));
 
   const handleLogout = async () => {
     await logout();
@@ -109,25 +114,36 @@ export function Layout({ children, sidebarContent }: LayoutProps) {
     { path: '/knowledge-center/graph', label: language === 'es' ? 'Grafo' : 'Graph', icon: KC_SUBMENU_ICONS.graph },
   ];
 
+  const client360Items = (() => {
+    if (!user) return [] as NavLinkItem[];
+    const items: NavLinkItem[] = [];
+    if (user.role === 'admin' || user.role === 'manager' || user.role === 'sme') {
+      items.push({ path: '/clients', label: language === 'es' ? 'Clientes' : 'Clients', icon: NAV_ICONS.clients });
+    }
+    items.push({ path: '/requests', label: language === 'es' ? 'Solicitudes' : 'Requests', icon: NAV_ICONS.requests });
+    if (user.role === 'admin' || user.role === 'manager' || user.role === 'sme') {
+      items.push({ path: '/cve', label: 'CVE', icon: NAV_ICONS.cve });
+    }
+    if (user.role === 'admin') {
+      items.push({ path: '/cve-sync', label: 'CVE Sync', icon: NAV_ICONS.cve });
+    }
+    if (user.role === 'admin' || user.role === 'manager') {
+      items.push({ path: '/sla-policies', label: 'SLA', icon: NAV_ICONS.sla });
+    }
+    return items;
+  })();
+
+  const isClient360Active = client360Items.some((item) => isActive(item.path));
+
   const getNavLinks = (): NavLinkItem[] => {
     if (!user) return [];
 
     const links: NavLinkItem[] = [{ path: '/app', label: t('home') || (language === 'es' ? 'Inicio' : 'Home'), icon: NAV_ICONS.home }];
 
-    links.push({ path: '/requests', label: language === 'es' ? 'Solicitudes' : 'Requests', icon: NAV_ICONS.requests });
-
     if (user.role === 'admin' || user.role === 'manager' || user.role === 'sme') {
       links.push({ path: '/dashboard', label: 'Dashboard', icon: NAV_ICONS.dashboard });
       links.push({ path: '/analytics', label: 'Analytics', icon: NAV_ICONS.analytics });
       links.push({ path: '/ask', label: t('chat') || 'Chat', icon: NAV_ICONS.chat });
-      links.push({ path: '/cve', label: 'CVE', icon: NAV_ICONS.cve });
-      if (user.role === 'admin') {
-        links.push({ path: '/cve-sync', label: 'CVE Sync', icon: NAV_ICONS.cve });
-      }
-    }
-
-    if (user.role === 'admin' || user.role === 'manager') {
-      links.push({ path: '/sla-policies', label: 'SLA', icon: NAV_ICONS.sla });
     }
 
     links.push({ path: '/notifications', label: language === 'es' ? 'Notificaciones' : 'Notifications', icon: NAV_ICONS.notifications });
@@ -155,6 +171,7 @@ export function Layout({ children, sidebarContent }: LayoutProps) {
 
   const navLinks = getNavLinks();
   const kcInsertIndex = navLinks.findIndex(l => l.path === '/ask') + 1;
+  const kcSplitIndex = kcInsertIndex > 0 ? kcInsertIndex : navLinks.length;
 
   return (
     <div className="app layout-app">
@@ -224,7 +241,47 @@ export function Layout({ children, sidebarContent }: LayoutProps) {
             </div>
 
             <div className="sidebar-nav">
-              {navLinks.slice(0, kcInsertIndex).map((link) => (
+              {navLinks.slice(0, 1).map((link) => (
+                <Link
+                  key={`${link.path}-${link.label}`}
+                  to={link.path}
+                  className={`nav-item ${isActive(link.path) ? 'active' : ''}`}
+                  onClick={() => setIsNavOpen(false)}
+                >
+                  <span className="nav-icon">{link.icon}</span>
+                  <span>{link.label}</span>
+                </Link>
+              ))}
+
+              {client360Items.length > 0 && (
+                <div className="nav-submenu">
+                  <button
+                    className={`nav-item nav-submenu-toggle ${isClient360Active ? 'active' : ''}`}
+                    onClick={() => setIsClient360Open(!isClient360Open)}
+                  >
+                    <span className="nav-icon">{NAV_ICONS.clients}</span>
+                    <span>Client360</span>
+                    <span className={`submenu-arrow ${isClient360Open ? 'open' : ''}`}>▸</span>
+                  </button>
+                  {isClient360Open && (
+                    <div className="nav-submenu-items">
+                      {client360Items.map((item) => (
+                        <Link
+                          key={item.path}
+                          to={item.path}
+                          className={`nav-item nav-submenu-item ${isActive(item.path) ? 'active' : ''}`}
+                          onClick={() => setIsNavOpen(false)}
+                        >
+                          <span className="nav-icon" style={{ width: 16, height: 16 }}>{item.icon}</span>
+                          <span>{item.label}</span>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {navLinks.slice(1, kcSplitIndex).map((link) => (
                 <Link
                   key={`${link.path}-${link.label}`}
                   to={link.path}
@@ -264,7 +321,7 @@ export function Layout({ children, sidebarContent }: LayoutProps) {
                 </div>
               )}
 
-              {navLinks.slice(kcInsertIndex).map((link) => (
+              {navLinks.slice(kcSplitIndex).map((link) => (
                 <Link
                   key={`${link.path}-${link.label}`}
                   to={link.path}

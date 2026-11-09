@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import {
   Classifications,
+  ContractStatuses,
+  ContractTypes,
   DeliverableStatuses,
   DeliverableTypes,
   DocumentTypes,
@@ -10,6 +12,7 @@ import {
   RequestKinds,
   RequestStatuses,
   RequestTypes,
+  ServiceModels,
   Severities,
   ThreadStatuses,
   ThreadTypes,
@@ -155,6 +158,50 @@ export const slaPolicySchema = z.object({
   calendarId: z.string().optional().nullable(),
   active: z.boolean().optional(),
   order: z.number().optional(),
+});
+
+export const contractSchema = z.object({
+  name: z.string().min(1).max(300),
+  contractNumber: z.string().max(120).optional().nullable(),
+  contractType: z.enum(tuple(ContractTypes)),
+  serviceModel: z.enum(tuple(ServiceModels)).optional().nullable(),
+  status: z.enum(tuple(ContractStatuses)).optional(),
+  signedAt: z.string().optional().nullable(),
+  startDate: z.string().optional().nullable(),
+  endDate: z.string().optional().nullable(),
+  autoRenew: z.boolean().optional(),
+  renewalNoticeDays: z.number().int().min(0).max(3650).optional().nullable(),
+  renewedFromContractId: z.string().optional().nullable(),
+  notes: z.string().max(5000).optional().nullable(),
+  metadata: z.record(z.any()).optional(),
+});
+
+export const contractUpdateSchema = contractSchema.partial();
+
+export const contractRenewSchema = contractSchema.partial().extend({
+  name: z.string().min(1).max(300).optional(),
+  contractType: z.enum(tuple(ContractTypes)).optional(),
+});
+
+export const contractCancelSchema = z.object({
+  reason: z.string().max(2000).optional().nullable(),
+  cancelledAt: z.string().optional().nullable(),
+});
+
+export const clientSlaOverrideSchema = z.object({
+  name: z.string().max(200).optional().nullable(),
+  requestType: z.enum(tuple(RequestTypes)).optional().nullable(),
+  priority: z.enum(tuple(Priorities)).optional().nullable(),
+  businessHoursOnly: z.boolean().optional().nullable(),
+  responseHours: z.number().min(0).max(1000).optional().nullable(),
+  resolutionHours: z.number().min(1).max(5000).optional().nullable(),
+  atRiskThresholdPct: z.number().min(0).max(100).optional().nullable(),
+  pauseOnWaitingClient: z.boolean().optional().nullable(),
+  calendarId: z.string().optional().nullable(),
+  effectiveFrom: z.string().optional().nullable(),
+  effectiveTo: z.string().optional().nullable(),
+  active: z.boolean().optional(),
+  reason: z.string().max(2000).optional().nullable(),
 });
 
 export const businessCalendarSchema = z.object({

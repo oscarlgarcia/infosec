@@ -77,7 +77,7 @@ export function CveSyncPage() {
 
   return (
     <Layout>
-      <div className="r360-page">
+      <div className="r360-page r360-page-scroll">
         <div className="r360-page-header">
           <div>
             <h1>{language === 'es' ? 'Sincronización CVE' : 'CVE synchronization'}</h1>

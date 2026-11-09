@@ -237,13 +237,13 @@ export function CveDetailPage() {
   };
 
   if (loading) {
-    return <Layout><div className="r360-page"><Loading lang={language} /></div></Layout>;
+    return <Layout><div className="r360-page r360-page-scroll"><Loading lang={language} /></div></Layout>;
   }
 
   if (!advisory && !record) {
     return (
       <Layout>
-        <div className="r360-page">
+        <div className="r360-page r360-page-scroll">
           <ErrorBanner error={error || 'CVE not found'} />
           <button className="r360-btn" onClick={() => navigate('/cve')}>← {language === 'es' ? 'Volver' : 'Back'}</button>
         </div>
@@ -262,7 +262,7 @@ export function CveDetailPage() {
 
   return (
     <Layout>
-      <div className="r360-page">
+      <div className="r360-page r360-page-scroll">
         <div className="r360-page-header">
           <div>
             <div className="r360-detail-topline">

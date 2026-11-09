@@ -2,6 +2,7 @@
 import {
   Classifications,
   ClientPhases,
+  ContractStatuses,
   ContractTypes,
   CustomerStatuses,
   DocumentTypes,
@@ -120,6 +121,53 @@ export const ClientSchema = new Schema({
   createdBy: { type: String },
   updatedBy: { type: String },
 }, { timestamps: true });
+
+export const ContractSchema = new Schema({
+  clientId: { type: Schema.Types.ObjectId, ref: 'Client', required: true, index: true },
+  name: { type: String, required: true },
+  contractNumber: { type: String },
+  contractType: { type: String, enum: ContractTypes, required: true, index: true },
+  serviceModel: { type: String, enum: ServiceModels },
+  status: { type: String, enum: ContractStatuses, default: 'draft', index: true },
+  signedAt: { type: Date },
+  startDate: { type: Date, index: true },
+  endDate: { type: Date, index: true },
+  autoRenew: { type: Boolean, default: false },
+  renewalNoticeDays: { type: Number },
+  renewedFromContractId: { type: Schema.Types.ObjectId, ref: 'Contract' },
+  replacedByContractId: { type: Schema.Types.ObjectId, ref: 'Contract' },
+  cancelledAt: { type: Date },
+  cancellationReason: { type: String },
+  attachments: [AttachmentSchema],
+  notes: { type: String },
+  metadata: { type: Schema.Types.Mixed },
+  createdBy: { type: String },
+  updatedBy: { type: String },
+}, { timestamps: true });
+
+ContractSchema.index({ clientId: 1, status: 1 });
+ContractSchema.index({ clientId: 1, endDate: 1 });
+
+export const ClientSlaOverrideSchema = new Schema({
+  clientId: { type: Schema.Types.ObjectId, ref: 'Client', required: true, index: true },
+  name: { type: String },
+  requestType: { type: String, enum: RequestTypes },
+  priority: { type: String, enum: Priorities },
+  businessHoursOnly: { type: Boolean },
+  responseHours: { type: Number },
+  resolutionHours: { type: Number },
+  atRiskThresholdPct: { type: Number },
+  pauseOnWaitingClient: { type: Boolean },
+  calendarId: { type: Schema.Types.ObjectId, ref: 'BusinessCalendar' },
+  effectiveFrom: { type: Date },
+  effectiveTo: { type: Date },
+  active: { type: Boolean, default: true, index: true },
+  reason: { type: String },
+  createdBy: { type: String },
+  updatedBy: { type: String },
+}, { timestamps: true });
+
+ClientSlaOverrideSchema.index({ clientId: 1, active: 1, requestType: 1, priority: 1 });
 
 export const ClientRequestSnapshotSchema = new Schema({
   name: { type: String },
@@ -583,6 +631,8 @@ export const QueueItem = model('QueueItem', QueueItemSchema);
 
 
 export const Client = model('Client', ClientSchema);
+export const Contract = model('Contract', ContractSchema);
+export const ClientSlaOverride = model('ClientSlaOverride', ClientSlaOverrideSchema);
 export const ClientRequest = model('ClientRequest', ClientRequestSchema);
 export const Conversation = model('Conversation', ConversationSchema);
 export const DocumentModel = model('DocumentModel', DocumentSchema);

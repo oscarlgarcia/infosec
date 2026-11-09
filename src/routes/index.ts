@@ -325,6 +325,19 @@ export async function routes(fastify: FastifyInstance) {
     return reply.send(stream);
   });
 
+  const CONTRACT_UPLOAD_DIR = path.join(process.cwd(), 'uploads', 'contracts');
+  fastify.get('/uploads/contracts/:filename', { preHandler: [verifyToken] }, async (request, reply) => {
+    const filename = path.basename((request.params as any).filename);
+    const filePath = path.join(CONTRACT_UPLOAD_DIR, filename);
+    if (!fs.existsSync(filePath)) {
+      return reply.code(404).send({ error: 'File not found' });
+    }
+    const stream = fs.createReadStream(filePath);
+    reply.header('Content-Type', 'application/octet-stream');
+    reply.header('Content-Disposition', `attachment; filename="${filename}"`);
+    return reply.send(stream);
+  });
+
   const ORCHESTRATOR_UPLOAD_DIR = path.join(process.cwd(), 'uploads', 'orchestrator');
   fastify.get('/uploads/orchestrator/:filename', async (request, reply) => {
     const filename = (request.params as any).filename;
@@ -1679,6 +1692,10 @@ fastify.get<{ Querystring: { q: string; topK?: number } }>(
   // Request 360 + Logbook routes
   const { requestRoutes } = await import('./request.routes');
   fastify.register(requestRoutes);
+
+  // Client contracts
+  const { contractRoutes } = await import('./contract.routes');
+  fastify.register(contractRoutes);
 
   // SLA policies, calendars and catalogs
   const { slaRoutes } = await import('./sla.routes');

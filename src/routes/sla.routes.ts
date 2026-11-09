@@ -1,9 +1,10 @@
 import { FastifyInstance } from 'fastify';
 import { verifyToken, requireRole } from '../middleware/auth';
-import { BusinessCalendar, Setting, SlaPolicy } from '../db/mongo/models';
+import { BusinessCalendar, ClientSlaOverride, Setting, SlaPolicy } from '../db/mongo/models';
 import { ContractTypes, ServiceModels } from '../types/request';
 import {
   businessCalendarSchema,
+  clientSlaOverrideSchema,
   parseOrThrow,
   slaPolicySchema,
 } from '../schemas/request';
@@ -44,6 +45,72 @@ export async function slaRoutes(fastify: FastifyInstance) {
     await SlaPolicy.findByIdAndDelete(request.params.id);
     return reply.code(204).send();
   });
+
+  function overridePayload(body: any, request: any) {
+    const payload: Record<string, any> = { ...body };
+    for (const key of ['effectiveFrom', 'effectiveTo']) {
+      if (payload[key] !== undefined) {
+        payload[key] = payload[key] ? new Date(payload[key]) : undefined;
+      }
+    }
+    if (payload.calendarId === '') payload.calendarId = undefined;
+    if (request.user) {
+      payload.updatedBy = request.user.username || request.user.email || request.user.id;
+    }
+    return payload;
+  }
+
+  fastify.get<{ Params: { id: string } }>(
+    '/clients/:id/sla-overrides',
+    { preHandler: [verifyToken] },
+    async (request) => {
+      const items = await ClientSlaOverride.find({ clientId: request.params.id })
+        .populate('calendarId', 'name timezone')
+        .sort({ createdAt: -1 })
+        .lean();
+      return { items };
+    }
+  );
+
+  fastify.post<{ Params: { id: string } }>(
+    '/clients/:id/sla-overrides',
+    { preHandler: [verifyToken, requireRole('admin', 'manager')] },
+    async (request, reply) => {
+      const body = parseOrThrow(clientSlaOverrideSchema, request.body);
+      const payload = overridePayload(body, request);
+      payload.clientId = request.params.id;
+      if (request.user) {
+        payload.createdBy = request.user.username || request.user.email || request.user.id;
+      }
+      const override = await ClientSlaOverride.create(payload);
+      return reply.code(201).send(override);
+    }
+  );
+
+  fastify.put<{ Params: { id: string } }>(
+    '/sla-overrides/:id',
+    { preHandler: [verifyToken, requireRole('admin', 'manager')] },
+    async (request, reply) => {
+      const body = parseOrThrow(clientSlaOverrideSchema.partial(), request.body);
+      const payload = overridePayload(body, request);
+      const override = await ClientSlaOverride.findByIdAndUpdate(
+        request.params.id,
+        { $set: payload },
+        { new: true }
+      );
+      if (!override) return reply.code(404).send({ error: 'SLA override not found' });
+      return override;
+    }
+  );
+
+  fastify.delete<{ Params: { id: string } }>(
+    '/sla-overrides/:id',
+    { preHandler: [verifyToken, requireRole('admin', 'manager')] },
+    async (request, reply) => {
+      await ClientSlaOverride.findByIdAndDelete(request.params.id);
+      return reply.code(204).send();
+    }
+  );
 
   fastify.get('/business-calendars', { preHandler: [verifyToken] }, async () => {
     await ensureDefaultSlaConfiguration();

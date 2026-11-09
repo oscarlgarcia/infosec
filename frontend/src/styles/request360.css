@@ -10,6 +10,16 @@
   color: var(--text, #111827);
 }
 
+/* Pages rendered directly inside .layout-content (which is overflow:hidden)
+   are clipped when their content is taller than the viewport. This modifier
+   turns the page itself into the scroll container. */
+.r360-page.r360-page-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 .r360-page-header {
   display: flex;
   align-items: flex-start;
@@ -850,6 +860,36 @@
 
 .r360-dashboard-grid > .r360-card {
   margin-bottom: 0;
+}
+
+.r360-detail-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.r360-detail-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 7px 0;
+  border-bottom: 1px dashed var(--border, #e5e7eb);
+  font-size: 13px;
+}
+
+.r360-detail-row:last-child {
+  border-bottom: none;
+}
+
+.r360-detail-row .r360-muted {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.r360-detail-row strong {
+  text-align: right;
+  word-break: break-word;
 }
 
 .r360-span-2 {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { useLanguage } from '../i18n/LanguageContext';
@@ -57,6 +57,7 @@ export function CveListPage() {
     sort: 'published',
   });
   const [form, setForm] = useState({ ...EMPTY_FORM });
+  const pageRef = useRef<HTMLDivElement>(null);
 
   const canManage = Boolean(user && ['admin', 'manager', 'sme'].includes(user.role));
   const isAdmin = user?.role === 'admin';
@@ -101,6 +102,11 @@ export function CveListPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // The page is its own scroll container: reset it when paging or switching tabs.
+  useEffect(() => {
+    pageRef.current?.scrollTo({ top: 0 });
+  }, [page, tab]);
 
   const switchTab = (next: TabKey) => {
     setTab(next);
@@ -161,7 +167,7 @@ export function CveListPage() {
 
   return (
     <Layout>
-      <div className="r360-page">
+      <div className="r360-page r360-page-scroll" ref={pageRef}>
         <div className="r360-page-header">
           <div>
             <h1>CVE</h1>

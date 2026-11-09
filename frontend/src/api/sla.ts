@@ -1,5 +1,5 @@
 import { apiRequest } from './client';
-import type { BusinessCalendar, SlaPolicy } from '../types/request360';
+import type { BusinessCalendar, ClientSlaOverride, SlaPolicy } from '../types/request360';
 
 export interface Catalogs {
   requestTypes: string[];
@@ -43,6 +43,22 @@ export const slaApi = {
 
   getCatalogs() {
     return apiRequest<Catalogs>('/catalogs');
+  },
+
+  listClientOverrides(clientId: string) {
+    return apiRequest<{ items: ClientSlaOverride[] }>(`/clients/${clientId}/sla-overrides`);
+  },
+
+  createClientOverride(clientId: string, payload: Record<string, any>) {
+    return apiRequest<ClientSlaOverride>(`/clients/${clientId}/sla-overrides`, { method: 'POST', json: payload });
+  },
+
+  updateClientOverride(id: string, payload: Record<string, any>) {
+    return apiRequest<ClientSlaOverride>(`/sla-overrides/${id}`, { method: 'PUT', json: payload });
+  },
+
+  deleteClientOverride(id: string) {
+    return apiRequest<void>(`/sla-overrides/${id}`, { method: 'DELETE' });
   },
 
   runSweep() {

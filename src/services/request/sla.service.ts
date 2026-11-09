@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import {
   BusinessCalendar,
   ClientRequest,
+  ClientSlaOverride,
   RequestEvent,
   SlaPolicy,
   ScheduledFollowUp,
@@ -203,10 +204,47 @@ export async function resolveSlaPolicy(request: any): Promise<{ policy: SlaPolic
     .sort((a, b) => b.score - a.score);
 
   const policy = candidates[0]?.policy || (await SlaPolicy.findOne({ active: true }).lean()) || DEFAULT_POLICY;
-  const calendar = policy.calendarId
-    ? await BusinessCalendar.findById(policy.calendarId).lean()
+
+  // Client-level exception: the most specific active override wins and only
+  // the fields it defines are merged over the global policy.
+  let override: any = null;
+  const clientId = (request as any).clientId?._id || (request as any).clientId;
+  if (clientId && mongoose.Types.ObjectId.isValid(String(clientId))) {
+    const overrides = await ClientSlaOverride.find({ clientId, active: true }).lean();
+    const now = Date.now();
+    override =
+      overrides
+        .filter((item: any) => {
+          if (item.effectiveFrom && new Date(item.effectiveFrom).getTime() > now) return false;
+          if (item.effectiveTo && new Date(item.effectiveTo).getTime() < now) return false;
+          if (item.requestType && item.requestType !== (request as any).requestType) return false;
+          if (item.priority && item.priority !== (request as any).priority) return false;
+          return true;
+        })
+        .sort((a: any, b: any) => {
+          const score = (item: any) => (item.requestType ? 2 : 0) + (item.priority ? 1 : 0);
+          return score(b) - score(a);
+        })[0] || null;
+  }
+
+  const effectivePolicy: any = { ...policy };
+  if (override) {
+    for (const key of [
+      'businessHoursOnly',
+      'responseHours',
+      'resolutionHours',
+      'atRiskThresholdPct',
+      'pauseOnWaitingClient',
+      'calendarId',
+    ]) {
+      if (override[key] !== undefined && override[key] !== null) effectivePolicy[key] = override[key];
+    }
+  }
+
+  const calendar = effectivePolicy.calendarId
+    ? await BusinessCalendar.findById(effectivePolicy.calendarId).lean()
     : await BusinessCalendar.findOne({ active: true }).lean();
-  return { policy, calendar: (calendar || {}) as BusinessCalendarLike };
+  return { policy: effectivePolicy, calendar: (calendar || {}) as BusinessCalendarLike };
 }
 
 export function computeSlaState(request: any, policy: SlaPolicyLike, now: Date = new Date()): 'on_track' | 'at_risk' | 'breached' | 'paused' {

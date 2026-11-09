@@ -57,12 +57,81 @@ export const REQUEST_TYPE_OPTIONS = [
   'BC/DR Test Result Request',
   'Cloud Customer PT Request',
   'Certification Request',
+  'Document Request',
   'Other Support',
   'Answer Builder',
 ] as const;
 
 export const CONTRACT_TYPES = ['MSA', 'SOW', 'DPA', 'NDA', 'subscription', 'reseller', 'other'] as const;
 export const SERVICE_MODELS = ['cloud', 'rent', 'ps', 'managed', 'hybrid', 'other'] as const;
+export const CONTRACT_STATUSES = ['draft', 'pending_signature', 'active', 'renewed', 'cancelled', 'expired'] as const;
+export type ContractStatus = typeof CONTRACT_STATUSES[number];
+
+export const CONTRACT_STATUS_LABELS: Record<ContractStatus, { es: string; en: string }> = {
+  draft: { es: 'Borrador', en: 'Draft' },
+  pending_signature: { es: 'Pendiente de firma', en: 'Pending signature' },
+  active: { es: 'Activo', en: 'Active' },
+  renewed: { es: 'Renovado', en: 'Renewed' },
+  cancelled: { es: 'Cancelado', en: 'Cancelled' },
+  expired: { es: 'Expirado', en: 'Expired' },
+};
+
+export interface ContractAttachment {
+  _id?: string;
+  id?: string;
+  filename: string;
+  originalName: string;
+  path?: string;
+  mimeType?: string;
+  size?: number;
+  createdAt?: string;
+}
+
+export interface Contract {
+  _id: string;
+  clientId: string;
+  name: string;
+  contractNumber?: string;
+  contractType: string;
+  serviceModel?: string;
+  status: ContractStatus | string;
+  signedAt?: string;
+  startDate?: string;
+  endDate?: string;
+  autoRenew?: boolean;
+  renewalNoticeDays?: number;
+  renewedFromContractId?: string;
+  replacedByContractId?: string;
+  cancelledAt?: string;
+  cancellationReason?: string;
+  attachments: ContractAttachment[];
+  notes?: string;
+  metadata?: Record<string, any>;
+  createdBy?: string;
+  updatedBy?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface ClientSlaOverride {
+  _id: string;
+  clientId: string;
+  name?: string;
+  requestType?: string;
+  priority?: string;
+  businessHoursOnly?: boolean;
+  responseHours?: number;
+  resolutionHours?: number;
+  atRiskThresholdPct?: number;
+  pauseOnWaitingClient?: boolean;
+  calendarId?: string | { _id: string; name?: string; timezone?: string };
+  effectiveFrom?: string;
+  effectiveTo?: string;
+  active?: boolean;
+  reason?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
 
 export interface RequestStakeholder {
   name?: string;

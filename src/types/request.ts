@@ -12,6 +12,7 @@ export const RequestTypes = [
   'BC/DR Test Result Request',
   'Cloud Customer PT Request',
   'Certification Request',
+  'Document Request',
   'Other Support',
   'Answer Builder',
 ] as const;
@@ -57,6 +58,9 @@ export type RequestChannel = typeof RequestChannels[number];
 
 export const ContractTypes = ['MSA', 'SOW', 'DPA', 'NDA', 'subscription', 'reseller', 'other'] as const;
 export type ContractType = typeof ContractTypes[number];
+
+export const ContractStatuses = ['draft', 'pending_signature', 'active', 'renewed', 'cancelled', 'expired'] as const;
+export type ContractStatus = typeof ContractStatuses[number];
 
 export const ServiceModels = ['cloud', 'rent', 'ps', 'hybrid'] as const;
 export type ServiceModel = typeof ServiceModels[number];
