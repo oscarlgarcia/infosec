@@ -150,6 +150,7 @@ export function serializeRequest(request: any, extras: Record<string, any> = {})
         country: node.clientId.country,
         customerStatus: node.clientId.customerStatus,
         currentPhase: node.clientId.currentPhase,
+        directory: node.clientId.directory,
       }
     : undefined;
 
@@ -200,6 +201,7 @@ export function serializeRequest(request: any, extras: Record<string, any> = {})
     duplicateOf: idOf(node.duplicateOf),
     mergedInto: idOf(node.mergedInto),
     attachments: (node.attachments || []).map(serializeAttachment),
+    directory: node.directory,
     createdBy: node.createdBy,
     updatedBy: node.updatedBy,
     createdAt: node.createdAt,

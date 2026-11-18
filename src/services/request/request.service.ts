@@ -330,7 +330,7 @@ export async function listRequests(filters: ListRequestsFilters = {}) {
 
   const [items, total] = await Promise.all([
     ClientRequest.find(query)
-      .populate('clientId', 'name clientType country customerStatus currentPhase')
+      .populate('clientId', 'name clientType country customerStatus currentPhase directory')
       .sort({ priority: 1, deadline: 1, lastActivityAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
@@ -350,9 +350,43 @@ export async function listRequests(filters: ListRequestsFilters = {}) {
 export async function getRequestById(requestId: string) {
   if (!mongoose.Types.ObjectId.isValid(requestId)) return null;
   const request = await ClientRequest.findById(requestId)
-    .populate('clientId', 'name clientType country customerStatus currentPhase contractType serviceModel businessUnit stakeholders')
+    .populate('clientId', 'name clientType country customerStatus currentPhase contractType serviceModel businessUnit stakeholders directory')
     .lean();
   return serializeRequest(request);
+}
+
+export interface RequestDirectoryInput {
+  localPath: string;
+}
+
+export async function saveRequestDirectory(
+  requestId: string,
+  data: RequestDirectoryInput,
+  addedBy?: string
+) {
+  if (!mongoose.Types.ObjectId.isValid(requestId)) return null;
+  const updated = await ClientRequest.findByIdAndUpdate(
+    requestId,
+    {
+      directory: {
+        localPath: data.localPath,
+        addedBy,
+      },
+    },
+    { new: true, runValidators: true }
+  ).lean();
+  return serializeRequest(updated);
+}
+
+export async function deleteRequestDirectory(requestId: string) {
+  if (!mongoose.Types.ObjectId.isValid(requestId)) return null;
+  const updated = await ClientRequest.findByIdAndUpdate(
+    requestId,
+    { $unset: { directory: 1 } },
+    { new: true }
+  ).lean();
+  if (!updated) return null;
+  return serializeRequest(updated);
 }
 
 export async function getRequest360(requestId: string, options: { includeInternal?: boolean } = {}) {

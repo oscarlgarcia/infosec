@@ -92,6 +92,15 @@ export const TechnologyInventoryItemSchema = new Schema({
   notes: { type: String },
 });
 
+/**
+ * Local directory synced from SharePoint/OneDrive on the user's machine.
+ * The backend only stores the path; it never opens or lists it.
+ */
+export const DirectorySchema = new Schema({
+  localPath: { type: String, required: true },
+  addedBy: { type: String },
+}, { _id: false, timestamps: true });
+
 export const ClientSchema = new Schema({
   name: { type: String, required: true },
   clientType: { type: String, enum: ClientType, required: true },
@@ -111,6 +120,7 @@ export const ClientSchema = new Schema({
   clientOwnerId: { type: String, index: true },
   infosecOwnerId: { type: String, index: true },
   infosecRepoUrl: { type: String },
+  directory: { type: DirectorySchema },
   stakeholders: { type: [StakeholderSchema], default: [] },
   cveSubscriptions: {
     enabled: { type: Boolean, default: false },
@@ -221,6 +231,7 @@ export const ClientRequestSchema = new Schema({
   stakeholders: { type: [StakeholderSchema], default: [] },
   clientSnapshot: { type: ClientRequestSnapshotSchema },
   templateId: { type: Schema.Types.ObjectId, ref: 'RequestTemplate' },
+  directory: { type: DirectorySchema },
 
   // SLA and derived milestones (event-based, never updatedAt)
   slaPolicyId: { type: Schema.Types.ObjectId, ref: 'SlaPolicy' },
@@ -801,6 +812,15 @@ export {
   ScheduledFollowUp,
   NotificationPreference,
 } from './models/request';
+
+// Global Evidence Matrix
+export {
+  EvidenceItem,
+  EvidenceItemSchema,
+  EvidenceAssetSchema,
+  EvidenceMapping,
+  EvidenceMappingSchema,
+} from './models/evidence';
 
 // Metric Configuration for Analytics Dashboard
 export const MetricConfigurationSchema = new Schema({

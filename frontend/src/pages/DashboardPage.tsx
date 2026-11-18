@@ -38,18 +38,18 @@ export function DashboardPage() {
   }, [load]);
 
   if (loading) {
-    return <Layout><div className="r360-page"><Loading lang={language} /></div></Layout>;
+    return <Layout><div className="r360-page r360-page-scroll"><Loading lang={language} /></div></Layout>;
   }
 
   if (!data) {
-    return <Layout><div className="r360-page"><ErrorBanner error={error} /></div></Layout>;
+    return <Layout><div className="r360-page r360-page-scroll"><ErrorBanner error={error} /></div></Layout>;
   }
 
   const maxPipeline = Math.max(1, ...data.pipeline.map((item) => item.count));
 
   return (
     <Layout>
-      <div className="r360-page">
+      <div className="r360-page r360-page-scroll">
         <div className="r360-page-header">
           <div>
             <h1>{language === 'es' ? 'Dashboard InfoSec' : 'InfoSec Dashboard'}</h1>

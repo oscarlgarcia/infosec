@@ -11,6 +11,41 @@ import { serializeRequest } from '../request/serializer';
 
 const UPLOAD_DIR = path.join(process.cwd(), 'uploads', 'clients');
 
+function serializeClient(client: any): ClientType {
+  return {
+    id: client._id.toString(),
+    name: client.name,
+    clientType: client.clientType as any,
+    country: client.country,
+    contact: client.contact,
+    attachments: (client.attachments || []).map((a: any) => ({
+      id: a._id?.toString() || a.filename,
+      filename: a.filename,
+      originalName: a.originalName,
+      path: a.path,
+      mimeType: a.mimeType,
+      size: a.size,
+      createdAt: a.createdAt,
+    })),
+    customerStatus: client.customerStatus,
+    currentPhase: client.currentPhase,
+    contractSigned: client.contractSigned,
+    contractType: client.contractType,
+    serviceModel: client.serviceModel,
+    businessUnit: client.businessUnit,
+    tags: client.tags || [],
+    salesOwnerId: client.salesOwnerId,
+    clientOwnerId: client.clientOwnerId,
+    infosecOwnerId: client.infosecOwnerId,
+    directory: client.directory || undefined,
+    stakeholders: client.stakeholders || [],
+    cveSubscriptions: client.cveSubscriptions,
+    technologyInventory: client.technologyInventory || [],
+    createdAt: client.createdAt,
+    updatedAt: client.updatedAt,
+  };
+}
+
 export async function createClient(data: {
   name: string;
   clientType: string;
@@ -18,74 +53,18 @@ export async function createClient(data: {
   contact?: string;
 }): Promise<ClientType> {
   const client = await Client.create(data);
-  return {
-    id: client._id.toString(),
-    name: client.name,
-    clientType: client.clientType as any,
-    country: client.country,
-    contact: client.contact,
-    attachments: [],
-    createdAt: client.createdAt,
-    updatedAt: client.updatedAt,
-  };
+  return serializeClient(client);
 }
 
 export async function getAllClients(): Promise<ClientType[]> {
   const clients = await Client.find().sort({ createdAt: -1 }).lean();
-  return clients.map((c: any) => ({
-    id: c._id.toString(),
-    name: c.name,
-    clientType: c.clientType,
-    country: c.country,
-    contact: c.contact,
-    attachments: (c.attachments || []).map((a: any) => ({
-      id: a._id?.toString() || a.filename,
-      filename: a.filename,
-      originalName: a.originalName,
-      path: a.path,
-      mimeType: a.mimeType,
-      size: a.size,
-      createdAt: a.createdAt,
-    })),
-    customerStatus: c.customerStatus,
-    currentPhase: c.currentPhase,
-    contractSigned: c.contractSigned,
-    contractType: c.contractType,
-    serviceModel: c.serviceModel,
-    businessUnit: c.businessUnit,
-    tags: c.tags || [],
-    salesOwnerId: c.salesOwnerId,
-    clientOwnerId: c.clientOwnerId,
-    infosecOwnerId: c.infosecOwnerId,
-    stakeholders: c.stakeholders || [],
-    cveSubscriptions: c.cveSubscriptions,
-    technologyInventory: c.technologyInventory || [],
-    createdAt: c.createdAt,
-    updatedAt: c.updatedAt,
-  }));
+  return clients.map((c: any) => serializeClient(c));
 }
 
 export async function getClient(id: string): Promise<ClientType | null> {
   const client = await Client.findById(id).lean();
   if (!client) return null;
-  return {
-    id: (client as any)._id.toString(),
-    name: client.name,
-    clientType: client.clientType as any,
-    country: client.country,
-    contact: client.contact,
-    attachments: (client.attachments || []).map((a: any) => ({
-      id: a._id?.toString() || a.filename,
-      filename: a.filename,
-      originalName: a.originalName,
-      path: a.path,
-      mimeType: a.mimeType,
-      size: a.size,
-      createdAt: a.createdAt,
-    })),
-    createdAt: client.createdAt,
-    updatedAt: client.updatedAt,
-  };
+  return serializeClient(client);
 }
 
 export async function updateClient(id: string, data: Partial<{
@@ -93,27 +72,85 @@ export async function updateClient(id: string, data: Partial<{
   clientType: string;
   country?: string;
   contact?: string;
+  customerStatus?: string;
+  currentPhase?: string;
+  contractSigned?: boolean;
+  contractType?: string;
+  serviceModel?: string;
+  businessUnit?: string;
+  tags?: string[];
+  salesOwnerId?: string;
+  clientOwnerId?: string;
+  infosecOwnerId?: string;
+  infosecRepoUrl?: string;
 }>): Promise<ClientType | null> {
-  const client = await Client.findByIdAndUpdate(id, data, { new: true }).lean();
+  const assignable = [
+    'name',
+    'clientType',
+    'country',
+    'contact',
+    'customerStatus',
+    'currentPhase',
+    'contractSigned',
+    'contractType',
+    'serviceModel',
+    'businessUnit',
+    'tags',
+    'salesOwnerId',
+    'clientOwnerId',
+    'infosecOwnerId',
+    'infosecRepoUrl',
+  ] as const;
+
+  const update: Record<string, any> = {};
+  const unset: Record<string, 1> = {};
+  for (const key of assignable) {
+    const value = (data as any)[key];
+    if (value === undefined) continue;
+    if (value === null) {
+      unset[key] = 1;
+    } else {
+      update[key] = value;
+    }
+  }
+
+  const mutation: Record<string, any> = Object.keys(unset).length
+    ? {
+        ...(Object.keys(update).length ? { $set: update } : {}),
+        $unset: unset,
+      }
+    : update;
+
+  const client = await Client.findByIdAndUpdate(id, mutation, {
+    new: true,
+    runValidators: true,
+  }).lean();
   if (!client) return null;
-  return {
-    id: (client as any)._id.toString(),
-    name: client.name,
-    clientType: client.clientType as any,
-    country: client.country,
-    contact: client.contact,
-    attachments: (client.attachments || []).map((a: any) => ({
-      id: a._id?.toString() || a.filename,
-      filename: a.filename,
-      originalName: a.originalName,
-      path: a.path,
-      mimeType: a.mimeType,
-      size: a.size,
-      createdAt: a.createdAt,
-    })),
-    createdAt: client.createdAt,
-    updatedAt: client.updatedAt,
-  };
+  return serializeClient(client);
+}
+
+export async function saveClientDirectory(
+  id: string,
+  data: { localPath: string },
+  addedBy?: string
+): Promise<ClientType | null> {
+  const client = await Client.findByIdAndUpdate(
+    id,
+    { directory: { ...data, addedBy } },
+    { new: true, runValidators: true }
+  ).lean();
+  if (!client) return null;
+  return serializeClient(client);
+}
+
+export async function deleteClientDirectory(id: string): Promise<ClientType | null> {
+  const client = await Client.findByIdAndUpdate(
+    id,
+    { $unset: { directory: 1 } },
+    { new: true }
+  ).lean();
+  if (!client) return null;
+  return serializeClient(client);
 }
 
 export async function deleteClient(id: string): Promise<void> {

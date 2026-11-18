@@ -84,7 +84,7 @@ export function RequestsPage() {
 
   return (
     <Layout>
-      <div className="r360-page">
+      <div className="r360-page r360-page-scroll r360-list-page">
         <div className="r360-page-header">
           <div>
             <h1>{language === 'es' ? 'Solicitudes' : 'Requests'}</h1>

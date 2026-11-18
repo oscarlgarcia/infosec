@@ -15,9 +15,19 @@
    turns the page itself into the scroll container. */
 .r360-page.r360-page-scroll {
   flex: 1 1 auto;
+  height: 100%;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+
+/* Global listing rule: every list page uses
+   `r360-page r360-page-scroll r360-list-page` so it scrolls and occupies
+   80% of the available page width. */
+.r360-page.r360-list-page {
+  width: 80%;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .r360-page-header {
@@ -361,6 +371,83 @@
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+/* Directory (client and request) ------------------------------------------- */
+.r360-dir-view {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.r360-dir-local {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  flex-wrap: wrap;
+}
+
+.r360-dir-local > div {
+  min-width: 0;
+  flex: 1 1 320px;
+}
+
+.r360-dir-local code {
+  display: block;
+  margin-top: 4px;
+  word-break: break-all;
+}
+
+.r360-dir-hint {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(30, 41, 84, 0.05);
+  border: 1px dashed var(--border, #e5e7eb);
+  color: var(--muted, #42526b);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.r360-dir-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.r360-dir-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary, #1e2954);
+}
+
+.r360-dir-form input {
+  width: 100%;
+}
+
+.r360-dir-overview-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.r360-note {
+  margin: 12px 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  background: rgba(39, 101, 200, 0.07);
+  border: 1px solid rgba(39, 101, 200, 0.18);
+  color: var(--muted, #42526b);
+}
+
+.r360-client-form .r360-form-grid {
+  margin-bottom: 4px;
 }
 
 .r360-create-row {
@@ -1144,6 +1231,12 @@
 
   .r360-board {
     grid-template-columns: repeat(8, minmax(180px, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .r360-page.r360-list-page {
+    width: 100%;
   }
 }
 

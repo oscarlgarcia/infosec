@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { Client, Chat, Message, Agent, ClientRequest } from '../types';
 import { useLanguage } from '../i18n/LanguageContext';
+import { countryName } from '../constants/countries';
 import { CreateRequestModal } from '../components/CreateRequestModal';
 import { ViewClientModal } from '../components/ViewClientModal';
 import { ViewRequestModal } from '../components/ViewRequestModal';
@@ -416,7 +417,7 @@ export function AskKnowledgeBase() {
           <div className="client-info-details">
             <span className="client-info-type">{selectedClient.clientType}</span>
             {selectedClient.country && (
-              <span className="client-info-request">{selectedClient.country}</span>
+              <span className="client-info-request">{countryName(selectedClient.country, language)}</span>
             )}
             {selectedClient.contact && (
               <span className="client-info-deadline">

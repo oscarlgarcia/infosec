@@ -48,9 +48,12 @@ export async function listAdvisories(filters: { severity?: string; status?: stri
 }
 
 export async function getAdvisory(id: string) {
-  const advisory = await CveAdvisory.findById(id).lean();
+  // Accept both the Mongo `_id` and the CVE code (e.g. CVE-2026-96889).
+  // Looking up by code avoids a Mongoose CastError/500 when the detail page
+  // falls back to the advisory endpoint with a CVE id.
+  const advisory: any = await findAdvisoryByKey(id);
   if (!advisory) throw Object.assign(new Error('Advisory not found'), { statusCode: 404 });
-  const impacts = await CveImpact.find({ advisoryId: id })
+  const impacts = await CveImpact.find({ advisoryId: advisory._id })
     .populate('clientId', 'name clientType country customerStatus')
     .lean();
   return { ...advisory, impacts };

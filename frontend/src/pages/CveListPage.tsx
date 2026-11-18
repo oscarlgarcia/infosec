@@ -167,7 +167,7 @@ export function CveListPage() {
 
   return (
     <Layout>
-      <div className="r360-page r360-page-scroll" ref={pageRef}>
+      <div className="r360-page r360-page-scroll r360-list-page" ref={pageRef}>
         <div className="r360-page-header">
           <div>
             <h1>CVE</h1>

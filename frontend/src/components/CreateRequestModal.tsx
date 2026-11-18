@@ -2,52 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import type { RequestType, Client } from '../types';
 import { useI18n } from '../i18n/useI18n';
 import { requestsApi } from '../api/requests';
-
-const COUNTRIES = [
-  { code: 'ES', name: 'España' },
-  { code: 'US', name: 'Estados Unidos' },
-  { code: 'GB', name: 'Reino Unido' },
-  { code: 'FR', name: 'Francia' },
-  { code: 'DE', name: 'Alemania' },
-  { code: 'IT', name: 'Italia' },
-  { code: 'PT', name: 'Portugal' },
-  { code: 'NL', name: 'Países Bajos' },
-  { code: 'BE', name: 'Bélgica' },
-  { code: 'CH', name: 'Suiza' },
-  { code: 'AT', name: 'Austria' },
-  { code: 'IE', name: 'Irlanda' },
-  { code: 'SE', name: 'Suecia' },
-  { code: 'NO', name: 'Noruega' },
-  { code: 'DK', name: 'Dinamarca' },
-  { code: 'FI', name: 'Finlandia' },
-  { code: 'PL', name: 'Polonia' },
-  { code: 'CZ', name: 'República Checa' },
-  { code: 'HU', name: 'Hungría' },
-  { code: 'RO', name: 'Rumania' },
-  { code: 'GR', name: 'Grecia' },
-  { code: 'MX', name: 'México' },
-  { code: 'AR', name: 'Argentina' },
-  { code: 'CL', name: 'Chile' },
-  { code: 'CO', name: 'Colombia' },
-  { code: 'BR', name: 'Brasil' },
-  { code: 'PE', name: 'Perú' },
-  { code: 'VE', name: 'Venezuela' },
-  { code: 'CA', name: 'Canadá' },
-  { code: 'AU', name: 'Australia' },
-  { code: 'JP', name: 'Japón' },
-  { code: 'CN', name: 'China' },
-  { code: 'IN', name: 'India' },
-  { code: 'SG', name: 'Singapur' },
-  { code: 'HK', name: 'Hong Kong' },
-  { code: 'KR', name: 'Corea del Sur' },
-  { code: 'AE', name: 'Emiratos Árabes Unidos' },
-  { code: 'SA', name: 'Arabia Saudita' },
-  { code: 'IL', name: 'Israel' },
-  { code: 'ZA', name: 'Sudáfrica' },
-  { code: 'NG', name: 'Nigeria' },
-  { code: 'EG', name: 'Egipto' },
-  { code: 'MA', name: 'Marruecos' },
-];
+import { COUNTRIES } from '../constants/countries';
 
 interface CreateRequestModalProps {
   clientId?: string;
@@ -79,7 +34,7 @@ const REQUEST_TYPES: RequestType[] = [
 const CLIENT_TYPES = ['Cloud', 'Rent', 'PS'] as const;
 
 export function CreateRequestModal({ clientId, clients = [], isOpen, onClose, onSubmit, onCreateClient }: CreateRequestModalProps) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [selectedClientId, setSelectedClientId] = useState<string>(clientId || '');
   const [showCreateClient, setShowCreateClient] = useState(false);
   const [formData, setFormData] = useState({
@@ -250,7 +205,7 @@ export function CreateRequestModal({ clientId, clients = [], isOpen, onClose, on
               >
                 <option value="">--</option>
                 {COUNTRIES.map(c => (
-                  <option key={c.code} value={c.code}>{c.name}</option>
+                  <option key={c.code} value={c.code}>{language === 'es' ? c.name : c.nameEn}</option>
                 ))}
               </select>
             </div>

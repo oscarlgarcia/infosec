@@ -1,5 +1,6 @@
 import type { Client } from '../types';
 import { useI18n } from '../i18n/useI18n';
+import { countryName } from '../constants/countries';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
@@ -44,7 +45,7 @@ export function ViewClientModal({ client, isOpen, onClose }: ViewClientModalProp
           {client.country && (
             <div className="detail-item">
               <label>{t('clientCountry')}</label>
-              <div className="detail-value">{client.country}</div>
+              <div className="detail-value">{countryName(client.country, language)}</div>
             </div>
           )}
 

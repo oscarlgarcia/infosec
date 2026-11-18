@@ -49,7 +49,10 @@ import { CveDetailPage } from './pages/CveDetailPage'
 import { CveSyncPage } from './pages/CveSyncPage'
 import { SlaPoliciesPage } from './pages/SlaPoliciesPage'
 import { NotificationsPage } from './pages/NotificationsPage'
+import { EvidenceMatrixPage } from './pages/EvidenceMatrixPage'
+import { EvidenceFormPage } from './pages/EvidenceFormPage'
 import './styles/request360.css'
+import './styles/evidence.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
@@ -393,6 +396,38 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
               element={
                 <ProtectedRoute>
                   <NotificationsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/evidence-matrix"
+              element={
+                <ProtectedRoute>
+                  <EvidenceMatrixPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/evidence-matrix/new"
+              element={
+                <ProtectedRoute>
+                  <EvidenceFormPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/evidence-matrix/:id"
+              element={
+                <ProtectedRoute>
+                  <EvidenceMatrixPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/evidence-matrix/:id/edit"
+              element={
+                <ProtectedRoute>
+                  <EvidenceFormPage />
                 </ProtectedRoute>
               }
             />

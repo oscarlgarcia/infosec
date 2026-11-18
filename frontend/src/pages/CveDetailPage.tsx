@@ -127,7 +127,20 @@ export function CveDetailPage() {
 
     async function loadLooseAdvisory(cveId: string) {
       try {
-        const response = await cveApi.get(cveId);
+        // Look the advisory up through the list endpoint first. A direct
+        // `/cve-advisories/:id` call would return 404 for every catalog record
+        // without an advisory, which shows up as a console error on the page.
+        const listed = await cveApi.list({ q: cveId, limit: 100 });
+        const match = listed.items.find(
+          (item) => String(item.cveId || '').toUpperCase() === cveId.toUpperCase()
+        );
+        if (!match) {
+          setAdvisory(null);
+          setForm(emptyForm());
+          return;
+        }
+        // Fetch by `_id` to include the impact list in the detail response.
+        const response = await cveApi.get(match._id);
         setAdvisory(response);
         setForm(formFromAdvisory(response));
       } catch {

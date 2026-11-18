@@ -7,6 +7,7 @@ import { requestsApi } from '../api/requests';
 import type {
   AiArtifact,
   Deliverable,
+  Request360,
   Request360Detail,
   RequestDocument,
   RequestEvent,
@@ -24,6 +25,7 @@ import {
   formatDate,
   formatDateTime,
 } from '../components/request360/badges';
+import { copyText, formatDirectoryError, isWindowsPath, normalizeLocalPath } from '../utils/directory';
 
 type TabKey = 'logbook' | 'threads' | 'documents' | 'deliverables' | 'sla' | 'ai';
 
@@ -73,6 +75,7 @@ export function RequestDetailPage() {
 
   const canManage = Boolean(user && ['admin', 'manager', 'sme'].includes(user.role));
   const canDelete = Boolean(user && ['admin', 'manager'].includes(user.role));
+  const canManageDirectory = Boolean(user && ['admin', 'manager'].includes(user.role));
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -297,6 +300,14 @@ export function RequestDetailPage() {
           <div><span>{language === 'es' ? 'Modelo' : 'Service model'}</span><strong>{request.serviceModel || '—'}</strong></div>
           <div><span>Tags</span><strong>{request.tags?.length ? request.tags.join(', ') : '—'}</strong></div>
         </div>
+
+        <RequestDirectoryCard
+          request={request}
+          canManage={canManageDirectory}
+          language={language}
+          onChanged={load}
+          onError={setError}
+        />
 
         {canManage && (
           <div className="r360-card r360-inline-actions">
@@ -705,6 +716,205 @@ function DeliverableRow({
           <span className="r360-badge r360-status-new">{DELIVERABLE_STATUS_LABELS[deliverable.status]?.[lang] || deliverable.status}</span>
         )}
       </div>
+    </div>
+  );
+}
+
+function RequestDirectoryCard({
+  request,
+  canManage,
+  language,
+  onChanged,
+  onError,
+}: {
+  request: Request360;
+  canManage: boolean;
+  language: 'es' | 'en';
+  onChanged: () => Promise<void> | void;
+  onError: (message: string | null) => void;
+}) {
+  const clientDirectory = request.client?.directory;
+  const requestDirectory = request.directory;
+  const effectivePath = requestDirectory?.localPath || clientDirectory?.localPath || '';
+
+  const [editing, setEditing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [form, setForm] = useState({ localPath: '' });
+
+  const startEdit = () => {
+    setForm({ localPath: effectivePath });
+    setEditing(true);
+    setNotice(null);
+    onError(null);
+  };
+
+  const save = async () => {
+    const localPath = normalizeLocalPath(form.localPath);
+    if (!localPath) {
+      onError(language === 'es' ? 'La ruta del directorio es obligatoria.' : 'The directory path is required.');
+      return;
+    }
+    if (!isWindowsPath(localPath)) {
+      onError(
+        language === 'es'
+          ? 'La ruta debe ser una ruta de Windows (C:\\... o \\\\servidor\\...).'
+          : 'The path must be a Windows path (C:\\... or \\\\server\\...).'
+      );
+      return;
+    }
+    setBusy(true);
+    setNotice(null);
+    onError(null);
+    try {
+      await requestsApi.saveDirectory(request.id, { localPath });
+      await onChanged();
+      setEditing(false);
+      setNotice(language === 'es' ? 'Directorio de la solicitud guardado.' : 'Request directory saved.');
+    } catch (err: any) {
+      onError(formatDirectoryError(err, language));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async () => {
+    const confirmed = window.confirm(
+      language === 'es'
+        ? '¿Quitar el directorio de esta solicitud?'
+        : 'Remove the directory from this request?'
+    );
+    if (!confirmed) return;
+    setBusy(true);
+    setNotice(null);
+    onError(null);
+    try {
+      await requestsApi.deleteDirectory(request.id);
+      await onChanged();
+      setNotice(language === 'es' ? 'Directorio de la solicitud eliminado.' : 'Request directory removed.');
+    } catch (err: any) {
+      onError(err.message || 'Error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const copyPath = async (value: string) => {
+    const copied = await copyText(value);
+    setNotice(
+      copied
+        ? (language === 'es' ? 'Ruta copiada al portapapeles.' : 'Path copied to clipboard.')
+        : (language === 'es' ? 'No se pudo copiar la ruta.' : 'Could not copy the path.')
+    );
+  };
+
+  return (
+    <div className="r360-card r360-section">
+      <div className="r360-section-head">
+        <h2>{language === 'es' ? 'Directorio' : 'Directory'}</h2>
+        {canManage && !editing && (
+          <div className="r360-inline-group">
+            <button className="r360-btn" onClick={startEdit}>
+              {requestDirectory
+                ? (language === 'es' ? 'Editar' : 'Edit')
+                : (language === 'es' ? 'Añadir directorio' : 'Add directory')}
+            </button>
+            {requestDirectory && (
+              <button className="r360-btn r360-btn-danger" disabled={busy} onClick={remove}>
+                {language === 'es' ? 'Quitar' : 'Remove'}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {notice && <div className="r360-success">{notice}</div>}
+
+      {editing ? (
+        <div className="r360-dir-form">
+          <label className="r360-dir-label" htmlFor="request-directory-path">
+            {language === 'es' ? 'Ruta del directorio' : 'Directory path'}
+          </label>
+          <input
+            id="request-directory-path"
+            placeholder={'C:\\Users\\...\\carpeta'}
+            value={form.localPath}
+            onChange={(event) => setForm({ localPath: event.target.value })}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !busy) save();
+            }}
+          />
+          <div className="r360-dir-hint">
+            {language === 'es'
+              ? 'Pega la ruta de Windows tal como la copias del Explorador (C:\\... o \\\\servidor\\...).'
+              : 'Paste the Windows path exactly as copied from Explorer (C:\\... or \\\\server\\...).'}
+          </div>
+          <div className="r360-inline-group">
+            <button className="r360-btn r360-btn-primary" disabled={busy || !form.localPath.trim()} onClick={save}>
+              {language === 'es' ? 'Guardar' : 'Save'}
+            </button>
+            <button className="r360-btn" disabled={busy} onClick={() => setEditing(false)}>
+              {language === 'es' ? 'Cancelar' : 'Cancel'}
+            </button>
+          </div>
+        </div>
+      ) : requestDirectory ? (
+        <div className="r360-dir-view">
+          <div className="r360-dir-local">
+            <div>
+              <div className="r360-muted">
+                {language === 'es' ? 'Ruta del directorio' : 'Directory path'}
+              </div>
+              <code className="r360-mono">{requestDirectory.localPath}</code>
+            </div>
+            <button className="r360-btn" onClick={() => copyPath(requestDirectory.localPath)}>
+              {language === 'es' ? 'Copiar ruta' : 'Copy path'}
+            </button>
+          </div>
+
+          <div className="r360-dir-hint">
+            {language === 'es'
+              ? 'Para abrirlo en Windows: Win+E, Ctrl+L y pega la ruta copiada.'
+              : 'To open it in Windows: Win+E, Ctrl+L and paste the copied path.'}
+          </div>
+        </div>
+      ) : clientDirectory ? (
+        <div className="r360-dir-view">
+          <div className="r360-dir-local">
+            <div>
+              <div className="r360-muted">
+                {language === 'es'
+                  ? 'Esta solicitud usa el directorio del cliente'
+                  : 'This request uses the client directory'}
+              </div>
+              <code className="r360-mono">{clientDirectory.localPath}</code>
+            </div>
+            <button className="r360-btn" onClick={() => copyPath(clientDirectory.localPath)}>
+              {language === 'es' ? 'Copiar ruta' : 'Copy path'}
+            </button>
+          </div>
+
+          <div className="r360-dir-hint">
+            {language === 'es'
+              ? 'Puedes guardar una ruta propia para esta solicitud si lo necesitas.'
+              : 'You can save a request-specific path if you need one.'}
+          </div>
+        </div>
+      ) : (
+        <EmptyState
+          icon="📁"
+          title={language === 'es' ? 'Sin directorio guardado' : 'No directory saved'}
+          text={
+            canManage
+              ? (language === 'es'
+                  ? 'Guarda la ruta del directorio de esta solicitud para copiarla desde aquí.'
+                  : 'Save the directory path for this request to copy it from here.')
+              : (language === 'es'
+                  ? 'Esta solicitud todavía no tiene un directorio guardado.'
+                  : 'This request does not have a directory saved yet.')
+          }
+        />
+      )}
     </div>
   );
 }

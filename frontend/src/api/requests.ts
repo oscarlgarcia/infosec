@@ -144,6 +144,14 @@ export const requestsApi = {
     return apiRequest<Request360>(`/requests/${id}`, { method: 'PATCH', json: payload });
   },
 
+  saveDirectory(id: string, payload: { localPath: string }) {
+    return apiRequest<Request360>(`/requests/${id}/directory`, { method: 'PUT', json: payload });
+  },
+
+  deleteDirectory(id: string) {
+    return apiRequest<Request360>(`/requests/${id}/directory`, { method: 'DELETE' });
+  },
+
   transition(id: string, status: string, reason?: string) {
     return apiRequest<Request360>(`/requests/${id}/status`, {
       method: 'POST',

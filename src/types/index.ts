@@ -42,6 +42,13 @@ export interface Attachment {
   createdAt: Date;
 }
 
+export interface DirectoryLink {
+  localPath: string;
+  addedBy?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
 export interface Client {
   id: string;
   name: string;
@@ -64,6 +71,7 @@ export interface Client {
   salesOwnerId?: string;
   clientOwnerId?: string;
   infosecOwnerId?: string;
+  directory?: DirectoryLink;
   stakeholders?: any[];
   cveSubscriptions?: any;
   technologyInventory?: any[];
@@ -82,6 +90,7 @@ export interface ClientRequest {
   comments?: string;
   status: 'open' | 'in_progress' | 'completed';
   attachments: Attachment[];
+  directory?: DirectoryLink;
   createdAt: Date;
   updatedAt: Date;
 }

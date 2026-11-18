@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { clientsApi } from '../api/clients';
 import type { Client } from '../types';
 import { EmptyState, ErrorBanner, Loading } from '../components/request360/badges';
+import { COUNTRIES, countryName } from '../constants/countries';
 
 const CLIENT_STATUSES = ['prospect', 'active', 'strategic', 'at_risk', 'churned'] as const;
 const CLIENT_PHASES = ['onboarding', 'active', 'renewal', 'offboarding'] as const;
@@ -20,6 +21,7 @@ export function ClientsPage() {
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [phaseFilter, setPhaseFilter] = useState('');
+  const [countryFilter, setCountryFilter] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({ name: '', clientType: 'Cloud', country: '', contact: '' });
@@ -48,20 +50,16 @@ export function ClientsPage() {
       }
       if (statusFilter && client.customerStatus !== statusFilter) return false;
       if (phaseFilter && client.currentPhase !== phaseFilter) return false;
+      if (countryFilter) {
+        const selected = COUNTRIES.find((country) => country.code === countryFilter);
+        const matches =
+          client.country === countryFilter ||
+          (selected && [selected.name, selected.nameEn].includes(client.country || ''));
+        if (!matches) return false;
+      }
       return true;
     });
-  }, [clients, query, statusFilter, phaseFilter]);
-
-  const kpis = useMemo(
-    () => ({
-      total: clients.length,
-      active: clients.filter((client) => ['active', 'strategic'].includes(client.customerStatus || '')).length,
-      atRisk: clients.filter((client) => client.customerStatus === 'at_risk').length,
-      contracted: clients.filter((client) => client.contractSigned).length,
-      cve: clients.filter((client) => client.cveSubscriptions?.enabled).length,
-    }),
-    [clients]
-  );
+  }, [clients, query, statusFilter, phaseFilter, countryFilter]);
 
   const createClient = async () => {
     if (!form.name.trim()) return;
@@ -85,12 +83,12 @@ export function ClientsPage() {
   };
 
   if (loading) {
-    return <Layout><div className="r360-page r360-page-scroll"><Loading lang={language} /></div></Layout>;
+    return <Layout><div className="r360-page r360-page-scroll r360-list-page"><Loading lang={language} /></div></Layout>;
   }
 
   return (
     <Layout>
-      <div className="r360-page r360-page-scroll">
+      <div className="r360-page r360-page-scroll r360-list-page">
         <div className="r360-page-header">
           <div>
             <h1>{language === 'es' ? 'Clientes' : 'Clients'}</h1>
@@ -111,14 +109,6 @@ export function ClientsPage() {
 
         <ErrorBanner error={error} />
 
-        <div className="r360-kpi-grid">
-          <Kpi label={language === 'es' ? 'Clientes' : 'Clients'} value={kpis.total} />
-          <Kpi label={language === 'es' ? 'Activos' : 'Active'} value={kpis.active} tone="success" />
-          <Kpi label={language === 'es' ? 'En riesgo' : 'At risk'} value={kpis.atRisk} tone="danger" />
-          <Kpi label={language === 'es' ? 'Con contrato' : 'Contracted'} value={kpis.contracted} tone="info" />
-          <Kpi label={language === 'es' ? 'Suscripción CVE' : 'CVE subscription'} value={kpis.cve} />
-        </div>
-
         {showCreate && (
           <div className="r360-card r360-section">
             <div className="r360-section-head">
@@ -135,11 +125,14 @@ export function ClientsPage() {
                 <option value="Rent">Rent</option>
                 <option value="PS">PS</option>
               </select>
-              <input
-                placeholder={language === 'es' ? 'País' : 'Country'}
-                value={form.country}
-                onChange={(event) => setForm({ ...form, country: event.target.value })}
-              />
+              <select value={form.country} onChange={(event) => setForm({ ...form, country: event.target.value })}>
+                <option value="">{language === 'es' ? 'País' : 'Country'}</option>
+                {COUNTRIES.map((country) => (
+                  <option key={country.code} value={country.code}>
+                    {language === 'es' ? country.name : country.nameEn}
+                  </option>
+                ))}
+              </select>
               <input
                 placeholder={language === 'es' ? 'Contacto' : 'Contact'}
                 value={form.contact}
@@ -166,6 +159,14 @@ export function ClientsPage() {
           <select value={phaseFilter} onChange={(event) => setPhaseFilter(event.target.value)}>
             <option value="">{language === 'es' ? 'Todas las fases' : 'All phases'}</option>
             {CLIENT_PHASES.map((phase) => <option key={phase} value={phase}>{phase}</option>)}
+          </select>
+          <select value={countryFilter} onChange={(event) => setCountryFilter(event.target.value)}>
+            <option value="">{language === 'es' ? 'Todos los países' : 'All countries'}</option>
+            {COUNTRIES.map((country) => (
+              <option key={country.code} value={country.code}>
+                {language === 'es' ? country.name : country.nameEn}
+              </option>
+            ))}
           </select>
           <span className="r360-muted">
             {filtered.length} {language === 'es' ? 'clientes' : 'clients'}
@@ -201,7 +202,7 @@ export function ClientsPage() {
                       {client.contact && <div className="r360-muted">{client.contact}</div>}
                     </td>
                     <td>{client.clientType}</td>
-                    <td>{client.country || '—'}</td>
+                    <td>{countryName(client.country, language) || '—'}</td>
                     <td>{client.customerStatus || '—'}</td>
                     <td>{client.currentPhase || '—'}</td>
                     <td>
@@ -224,14 +225,5 @@ export function ClientsPage() {
         </div>
       </div>
     </Layout>
-  );
-}
-
-function Kpi({ label, value, tone }: { label: string; value: string | number; tone?: 'info' | 'danger' | 'success' }) {
-  return (
-    <div className={`r360-kpi ${tone ? `r360-kpi-${tone}` : ''}`}>
-      <div className="r360-kpi-value">{value}</div>
-      <div className="r360-kpi-label">{label}</div>
-    </div>
   );
 }

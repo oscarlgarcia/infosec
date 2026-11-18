@@ -85,8 +85,11 @@ import {
   createClientRequest, 
   getClientRequest, 
   updateClientRequest, 
+  saveClientDirectory,
+  deleteClientDirectory,
   cleanAllData
 } from '../services/chat/chat';
+import { directoryLinkSchema, updateClientSchema } from '../schemas/client';
 import { QAEntry } from '../db/mongo/models';
 import type { Department, KnowledgeSourceType } from '../types';
 import { verifyToken, requireRole } from '../middleware/auth';
@@ -408,37 +411,18 @@ export async function routes(fastify: FastifyInstance) {
     }
   );
 
-  fastify.put<{ 
-    Params: { id: string };
-    Body: { 
-      name?: string;
-      clientType?: string;
-      requestType?: string;
-      sectionToReview?: string;
-      deadline?: string;
-      owner?: string;
-      comments?: string;
-    } 
-  }>(
+  fastify.put<{ Params: { id: string } }>(
     '/clients/:id',
-    { preHandler: [verifyToken, requireRole('admin', 'manager', 'sme')] },
-    async (request: FastifyRequest<{ 
-      Params: { id: string };
-      Body: { 
-        name?: string;
-        clientType?: string;
-        requestType?: string;
-        sectionToReview?: string;
-        deadline?: string;
-        owner?: string;
-        comments?: string;
+    { preHandler: [verifyToken, requireRole('admin', 'manager')] },
+    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+      const parsed = updateClientSchema.safeParse(request.body || {});
+      if (!parsed.success) {
+        return reply.code(400).send({
+          error: 'Invalid client payload',
+          details: parsed.error.flatten(),
+        });
       }
-    }>, reply: FastifyReply) => {
-      const { deadline, ...rest } = request.body;
-      const client = await updateClient(request.params.id, {
-        ...rest,
-        deadline: deadline ? new Date(deadline) : undefined,
-      } as any);
+      const client = await updateClient(request.params.id, parsed.data as any);
       if (!client) {
         return reply.code(404).send({ error: 'Client not found' });
       }
@@ -452,6 +436,48 @@ export async function routes(fastify: FastifyInstance) {
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       await deleteClient(request.params.id);
       return reply.code(204).send();
+    }
+  );
+
+  // Client directory (local path synced from SharePoint/OneDrive)
+  fastify.put<{ Params: { id: string } }>(
+    '/clients/:id/directory',
+    { preHandler: [verifyToken, requireRole('admin', 'manager')] },
+    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+      const parsed = directoryLinkSchema.safeParse(request.body);
+      if (!parsed.success) {
+        // Log only the failing fields (never the full payload) so a 400 can be
+        // diagnosed from the backend logs.
+        request.log.warn(
+          { clientId: request.params.id, fieldErrors: parsed.error.flatten().fieldErrors },
+          'Invalid directory path'
+        );
+        return reply.code(400).send({
+          error: 'Invalid directory path',
+          details: parsed.error.flatten(),
+        });
+      }
+      const client = await saveClientDirectory(
+        request.params.id,
+        { localPath: parsed.data.localPath },
+        request.user?.id
+      );
+      if (!client) {
+        return reply.code(404).send({ error: 'Client not found' });
+      }
+      return client;
+    }
+  );
+
+  fastify.delete<{ Params: { id: string } }>(
+    '/clients/:id/directory',
+    { preHandler: [verifyToken, requireRole('admin', 'manager')] },
+    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+      const client = await deleteClientDirectory(request.params.id);
+      if (!client) {
+        return reply.code(404).send({ error: 'Client not found' });
+      }
+      return client;
     }
   );
 
@@ -1696,6 +1722,10 @@ fastify.get<{ Querystring: { q: string; topK?: number } }>(
   // Client contracts
   const { contractRoutes } = await import('./contract.routes');
   fastify.register(contractRoutes);
+
+  // Global Evidence Matrix
+  const { evidenceRoutes } = await import('./evidence.routes');
+  fastify.register(evidenceRoutes);
 
   // SLA policies, calendars and catalogs
   const { slaRoutes } = await import('./sla.routes');

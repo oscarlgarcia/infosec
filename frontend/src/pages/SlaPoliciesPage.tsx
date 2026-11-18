@@ -136,12 +136,12 @@ export function SlaPoliciesPage() {
   };
 
   if (loading) {
-    return <Layout><div className="r360-page"><Loading lang={language} /></div></Layout>;
+    return <Layout><div className="r360-page r360-page-scroll r360-list-page"><Loading lang={language} /></div></Layout>;
   }
 
   return (
     <Layout>
-      <div className="r360-page">
+      <div className="r360-page r360-page-scroll r360-list-page">
         <div className="r360-page-header">
           <div>
             <h1>{language === 'es' ? 'Políticas SLA' : 'SLA Policies'}</h1>

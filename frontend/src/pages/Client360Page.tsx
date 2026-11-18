@@ -4,6 +4,7 @@ import { Layout } from '../components/Layout';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { dashboardApi } from '../api/dashboard';
+import { clientsApi } from '../api/clients';
 import { cveApi } from '../api/cve';
 import { contractsApi } from '../api/contracts';
 import { slaApi } from '../api/sla';
@@ -35,6 +36,8 @@ import {
   formatDate,
   formatDateTime,
 } from '../components/request360/badges';
+import { COUNTRIES, countryName } from '../constants/countries';
+import { copyText, formatDirectoryError, isWindowsPath, normalizeLocalPath } from '../utils/directory';
 
 type TabKey =
   | 'overview'
@@ -46,6 +49,7 @@ type TabKey =
   | 'sla'
   | 'contracts'
   | 'inventory'
+  | 'directory'
   | 'activity';
 
 const TABS: Record<TabKey, { es: string; en: string }> = {
@@ -58,6 +62,7 @@ const TABS: Record<TabKey, { es: string; en: string }> = {
   sla: { es: 'SLA', en: 'SLA' },
   contracts: { es: 'Contratos', en: 'Contracts' },
   inventory: { es: 'Inventario', en: 'Inventory' },
+  directory: { es: 'Directorio', en: 'Directory' },
   activity: { es: 'Actividad', en: 'Activity' },
 };
 
@@ -91,6 +96,28 @@ const EMPTY_OVERRIDE = {
   reason: '',
 };
 
+const CUSTOMER_STATUS_OPTIONS = ['prospect', 'active', 'strategic', 'at_risk', 'churned'];
+const CLIENT_PHASE_OPTIONS = ['onboarding', 'active', 'renewal', 'offboarding'];
+const CLIENT_SERVICE_MODELS = ['cloud', 'rent', 'ps', 'hybrid'];
+
+const EMPTY_CLIENT_PROFILE = {
+  name: '',
+  clientType: 'Cloud',
+  country: '',
+  contact: '',
+  customerStatus: '',
+  currentPhase: '',
+  contractSigned: false,
+  contractType: '',
+  serviceModel: '',
+  businessUnit: '',
+  salesOwnerId: '',
+  clientOwnerId: '',
+  infosecOwnerId: '',
+  infosecRepoUrl: '',
+  tags: '',
+};
+
 export function Client360Page() {
   const { id, tab } = useParams<{ id: string; tab?: string }>();
   const { language } = useLanguage();
@@ -106,6 +133,17 @@ export function Client360Page() {
   const [inventoryBusy, setInventoryBusy] = useState(false);
   const [inventoryNotice, setInventoryNotice] = useState<string | null>(null);
 
+  const [dirEditing, setDirEditing] = useState(false);
+  const [dirBusy, setDirBusy] = useState(false);
+  const [dirNotice, setDirNotice] = useState<string | null>(null);
+  const [overviewNotice, setOverviewNotice] = useState<string | null>(null);
+  const [dirForm, setDirForm] = useState({ localPath: '' });
+
+  const [clientEditing, setClientEditing] = useState(false);
+  const [clientBusy, setClientBusy] = useState(false);
+  const [clientNotice, setClientNotice] = useState<string | null>(null);
+  const [clientForm, setClientForm] = useState({ ...EMPTY_CLIENT_PROFILE });
+
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [contractForm, setContractForm] = useState({ ...EMPTY_CONTRACT });
   const [contractBusy, setContractBusy] = useState(false);
@@ -119,6 +157,7 @@ export function Client360Page() {
   const [overrideNotice, setOverrideNotice] = useState<string | null>(null);
 
   const canManage = Boolean(user && ['admin', 'manager', 'sme'].includes(user.role));
+  const canManageDirectory = Boolean(user && ['admin', 'manager'].includes(user.role));
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -215,6 +254,150 @@ export function Client360Page() {
       setError(err.message || 'Error');
     } finally {
       setInventoryBusy(false);
+    }
+  };
+
+  const startEditDirectory = () => {
+    const directory = data?.client?.directory;
+    setDirForm({ localPath: directory?.localPath || '' });
+    setDirEditing(true);
+    setDirNotice(null);
+  };
+
+  const saveDirectory = async () => {
+    if (!id) return;
+    const localPath = normalizeLocalPath(dirForm.localPath);
+    if (!localPath) {
+      setError(language === 'es' ? 'La ruta del directorio es obligatoria.' : 'The directory path is required.');
+      return;
+    }
+    if (!isWindowsPath(localPath)) {
+      setError(
+        language === 'es'
+          ? 'La ruta debe ser una ruta de Windows (C:\\... o \\\\servidor\\...).'
+          : 'The path must be a Windows path (C:\\... or \\\\server\\...).'
+      );
+      return;
+    }
+
+    setDirBusy(true);
+    setDirNotice(null);
+    setError(null);
+    try {
+      await clientsApi.saveDirectory(id, { localPath });
+      await load();
+      setDirEditing(false);
+      setDirNotice(language === 'es' ? 'Directorio guardado.' : 'Directory saved.');
+    } catch (err: any) {
+      setError(formatDirectoryError(err, language));
+    } finally {
+      setDirBusy(false);
+    }
+  };
+
+  const removeDirectory = async () => {
+    if (!id) return;
+    const confirmed = window.confirm(
+      language === 'es'
+        ? '¿Quitar el directorio de este cliente?'
+        : 'Remove the directory from this client?'
+    );
+    if (!confirmed) return;
+    setDirBusy(true);
+    setDirNotice(null);
+    setError(null);
+    try {
+      await clientsApi.deleteDirectory(id);
+      await load();
+      setDirNotice(language === 'es' ? 'Directorio eliminado.' : 'Directory removed.');
+    } catch (err: any) {
+      setError(err.message || 'Error');
+    } finally {
+      setDirBusy(false);
+    }
+  };
+
+  const copyDirectoryPath = async (value: string) => {
+    const copied = await copyText(value);
+    setDirNotice(
+      copied
+        ? (language === 'es' ? 'Ruta copiada al portapapeles.' : 'Path copied to clipboard.')
+        : (language === 'es' ? 'No se pudo copiar la ruta.' : 'Could not copy the path.')
+    );
+  };
+
+  const copyOverviewPath = async (value: string) => {
+    const copied = await copyText(value);
+    setOverviewNotice(
+      copied
+        ? (language === 'es' ? 'Ruta copiada al portapapeles.' : 'Path copied to clipboard.')
+        : (language === 'es' ? 'No se pudo copiar la ruta.' : 'Could not copy the path.')
+    );
+    window.setTimeout(() => setOverviewNotice(null), 4000);
+  };
+
+  const startEditClient = () => {
+    const client = data?.client as any;
+    const storedCountry = String(client?.country || '');
+    const countryCode = COUNTRIES.find((country) =>
+      [country.code, country.name, country.nameEn].includes(storedCountry)
+    )?.code || '';
+
+    setClientForm({
+      name: client?.name || '',
+      clientType: client?.clientType || 'Cloud',
+      country: countryCode,
+      contact: client?.contact || '',
+      customerStatus: client?.customerStatus || '',
+      currentPhase: client?.currentPhase || '',
+      contractSigned: Boolean(client?.contractSigned),
+      contractType: client?.contractType || '',
+      serviceModel: client?.serviceModel || '',
+      businessUnit: client?.businessUnit || '',
+      salesOwnerId: client?.salesOwnerId || '',
+      clientOwnerId: client?.clientOwnerId || '',
+      infosecOwnerId: client?.infosecOwnerId || '',
+      infosecRepoUrl: client?.infosecRepoUrl || '',
+      tags: (client?.tags || []).join(', '),
+    });
+    setClientNotice(null);
+    setClientEditing(true);
+    goToTab('overview');
+  };
+
+  const saveClientProfile = async () => {
+    if (!id || !clientForm.name.trim()) return;
+    setClientBusy(true);
+    setClientNotice(null);
+    setError(null);
+    try {
+      await clientsApi.update(id, {
+        name: clientForm.name.trim(),
+        clientType: clientForm.clientType,
+        country: clientForm.country || null,
+        contact: clientForm.contact.trim() || null,
+        customerStatus: clientForm.customerStatus || null,
+        currentPhase: clientForm.currentPhase || null,
+        contractSigned: clientForm.contractSigned,
+        contractType: clientForm.contractType || null,
+        serviceModel: clientForm.serviceModel || null,
+        businessUnit: clientForm.businessUnit.trim() || null,
+        tags: clientForm.tags
+          .split(',')
+          .map((tag) => tag.trim())
+          .filter(Boolean),
+        salesOwnerId: clientForm.salesOwnerId.trim() || null,
+        clientOwnerId: clientForm.clientOwnerId.trim() || null,
+        infosecOwnerId: clientForm.infosecOwnerId.trim() || null,
+        infosecRepoUrl: clientForm.infosecRepoUrl.trim() || null,
+      });
+      await load();
+      setClientEditing(false);
+      setClientNotice(language === 'es' ? 'Ficha del cliente guardada.' : 'Client profile saved.');
+    } catch (err: any) {
+      setError(err.message || 'Error');
+    } finally {
+      setClientBusy(false);
     }
   };
 
@@ -425,12 +608,17 @@ export function Client360Page() {
             </div>
             <h1>{client.name}</h1>
             <p className="r360-subtitle">
-              {[client.country, client.businessUnit, client.contractType, client.serviceModel].filter(Boolean).join(' · ')
+              {[countryName(client.country, language), client.businessUnit, client.contractType, client.serviceModel].filter(Boolean).join(' · ')
                 || (language === 'es' ? 'Vista 360 del cliente' : 'Client 360 view')}
             </p>
           </div>
           <div className="r360-header-actions">
             <button className="r360-btn" onClick={() => navigate('/clients')}>← {language === 'es' ? 'Clientes' : 'Clients'}</button>
+            {canManageDirectory && !clientEditing && (
+              <button className="r360-btn" onClick={startEditClient}>
+                {language === 'es' ? 'Editar ficha' : 'Edit profile'}
+              </button>
+            )}
             <Link className="r360-btn r360-btn-primary" to={`/requests/new?clientId=${clientId}`}>
               + {language === 'es' ? 'Nueva solicitud' : 'New request'}
             </Link>
@@ -438,6 +626,7 @@ export function Client360Page() {
         </div>
 
         <ErrorBanner error={error} />
+        {clientNotice && <div className="r360-success">{clientNotice}</div>}
 
         <div className="r360-tabs">
           {TAB_KEYS.map((key) => (
@@ -456,6 +645,179 @@ export function Client360Page() {
 
         {activeTab === 'overview' && (
           <div>
+            {clientEditing && (
+              <div className="r360-card r360-section r360-client-form">
+                <div className="r360-section-head">
+                  <h2>{language === 'es' ? 'Editar ficha del cliente' : 'Edit client profile'}</h2>
+                </div>
+
+                <div className="r360-form-grid">
+                  <label className="r360-field">
+                    {language === 'es' ? 'Nombre' : 'Name'}
+                    <input
+                      value={clientForm.name}
+                      onChange={(event) => setClientForm({ ...clientForm, name: event.target.value })}
+                    />
+                  </label>
+                  <label className="r360-field">
+                    {language === 'es' ? 'Tipo' : 'Type'}
+                    <select
+                      value={clientForm.clientType}
+                      onChange={(event) => setClientForm({ ...clientForm, clientType: event.target.value })}
+                    >
+                      {['Cloud', 'Rent', 'PS'].map((type) => (
+                        <option key={type} value={type}>{type}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="r360-field">
+                    {language === 'es' ? 'País' : 'Country'}
+                    <select
+                      value={clientForm.country}
+                      onChange={(event) => setClientForm({ ...clientForm, country: event.target.value })}
+                    >
+                      <option value="">—</option>
+                      {COUNTRIES.map((country) => (
+                        <option key={country.code} value={country.code}>
+                          {language === 'es' ? country.name : country.nameEn}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="r360-field">
+                    {language === 'es' ? 'Contacto' : 'Contact'}
+                    <input
+                      value={clientForm.contact}
+                      onChange={(event) => setClientForm({ ...clientForm, contact: event.target.value })}
+                    />
+                  </label>
+                  <label className="r360-field">
+                    {language === 'es' ? 'Estado del cliente' : 'Customer status'}
+                    <select
+                      value={clientForm.customerStatus}
+                      onChange={(event) => setClientForm({ ...clientForm, customerStatus: event.target.value })}
+                    >
+                      <option value="">—</option>
+                      {CUSTOMER_STATUS_OPTIONS.map((status) => (
+                        <option key={status} value={status}>{status}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="r360-field">
+                    {language === 'es' ? 'Fase' : 'Phase'}
+                    <select
+                      value={clientForm.currentPhase}
+                      onChange={(event) => setClientForm({ ...clientForm, currentPhase: event.target.value })}
+                    >
+                      <option value="">—</option>
+                      {CLIENT_PHASE_OPTIONS.map((phase) => (
+                        <option key={phase} value={phase}>{phase}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="r360-field">
+                    {language === 'es' ? 'Unidad de negocio' : 'Business unit'}
+                    <input
+                      value={clientForm.businessUnit}
+                      onChange={(event) => setClientForm({ ...clientForm, businessUnit: event.target.value })}
+                    />
+                  </label>
+                  <label className="r360-field">
+                    {language === 'es' ? 'Tags (separados por coma)' : 'Tags (comma separated)'}
+                    <input
+                      value={clientForm.tags}
+                      onChange={(event) => setClientForm({ ...clientForm, tags: event.target.value })}
+                    />
+                  </label>
+                  <div className="r360-field">
+                    {language === 'es' ? 'Contrato firmado' : 'Contract signed'}
+                    <label className="r360-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={clientForm.contractSigned}
+                        onChange={(event) => setClientForm({ ...clientForm, contractSigned: event.target.checked })}
+                      />
+                      {clientForm.contractSigned
+                        ? (language === 'es' ? 'Sí' : 'Yes')
+                        : (language === 'es' ? 'No' : 'No')}
+                    </label>
+                  </div>
+                  <label className="r360-field">
+                    {language === 'es' ? 'Tipo de contrato' : 'Contract type'}
+                    <select
+                      value={clientForm.contractType}
+                      onChange={(event) => setClientForm({ ...clientForm, contractType: event.target.value })}
+                    >
+                      <option value="">—</option>
+                      {CONTRACT_TYPES.map((type) => (
+                        <option key={type} value={type}>{type}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="r360-field">
+                    {language === 'es' ? 'Modalidad de servicio' : 'Service model'}
+                    <select
+                      value={clientForm.serviceModel}
+                      onChange={(event) => setClientForm({ ...clientForm, serviceModel: event.target.value })}
+                    >
+                      <option value="">—</option>
+                      {CLIENT_SERVICE_MODELS.map((model) => (
+                        <option key={model} value={model}>{model}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="r360-field">
+                    {language === 'es' ? 'Owner comercial' : 'Sales owner'}
+                    <input
+                      value={clientForm.salesOwnerId}
+                      onChange={(event) => setClientForm({ ...clientForm, salesOwnerId: event.target.value })}
+                    />
+                  </label>
+                  <label className="r360-field">
+                    {language === 'es' ? 'Owner cliente' : 'Client owner'}
+                    <input
+                      value={clientForm.clientOwnerId}
+                      onChange={(event) => setClientForm({ ...clientForm, clientOwnerId: event.target.value })}
+                    />
+                  </label>
+                  <label className="r360-field">
+                    {language === 'es' ? 'Owner InfoSec' : 'InfoSec owner'}
+                    <input
+                      value={clientForm.infosecOwnerId}
+                      onChange={(event) => setClientForm({ ...clientForm, infosecOwnerId: event.target.value })}
+                    />
+                  </label>
+                  <label className="r360-field r360-field-full">
+                    {language === 'es' ? 'Repositorio InfoSec' : 'InfoSec repository'}
+                    <input
+                      placeholder="https://..."
+                      value={clientForm.infosecRepoUrl}
+                      onChange={(event) => setClientForm({ ...clientForm, infosecRepoUrl: event.target.value })}
+                    />
+                  </label>
+                </div>
+
+                <div className="r360-note">
+                  {language === 'es'
+                    ? 'Los campos de contrato se sincronizan automáticamente cuando existe un contrato. Los valores manuales se conservan si no hay datos de contrato.'
+                    : 'Contract fields sync automatically when a contract exists. Manual values are preserved when contract data is missing.'}
+                </div>
+
+                <div className="r360-inline-group">
+                  <button
+                    className="r360-btn r360-btn-primary"
+                    disabled={clientBusy || !clientForm.name.trim()}
+                    onClick={saveClientProfile}
+                  >
+                    {language === 'es' ? 'Guardar ficha' : 'Save profile'}
+                  </button>
+                  <button className="r360-btn" disabled={clientBusy} onClick={() => setClientEditing(false)}>
+                    {language === 'es' ? 'Cancelar' : 'Cancel'}
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="r360-kpi-grid">
               <Kpi label={language === 'es' ? 'Solicitudes' : 'Requests'} value={metrics.totalRequests} />
               <Kpi label={language === 'es' ? 'Abiertas' : 'Open'} value={metrics.open} tone="info" />
@@ -472,10 +834,14 @@ export function Client360Page() {
                   <Detail label={language === 'es' ? 'Estado' : 'Status'} value={client.customerStatus} />
                   <Detail label={language === 'es' ? 'Fase' : 'Phase'} value={client.currentPhase} />
                   <Detail label={language === 'es' ? 'Tipo' : 'Type'} value={client.clientType} />
-                  <Detail label={language === 'es' ? 'País' : 'Country'} value={client.country} />
+                  <Detail label={language === 'es' ? 'País' : 'Country'} value={countryName(client.country, language)} />
                   <Detail label={language === 'es' ? 'Unidad de negocio' : 'Business unit'} value={client.businessUnit} />
                   <Detail label={language === 'es' ? 'Contrato' : 'Contract'} value={client.contractType} />
                   <Detail label={language === 'es' ? 'Modalidad' : 'Service model'} value={client.serviceModel} />
+                  <Detail
+                    label={language === 'es' ? 'Contrato firmado' : 'Contract signed'}
+                    value={client.contractSigned ? (language === 'es' ? 'Sí' : 'Yes') : (language === 'es' ? 'No' : 'No')}
+                  />
                   <Detail label={language === 'es' ? 'Owner cliente' : 'Client owner'} value={client.clientOwnerId} />
                   <Detail label={language === 'es' ? 'Owner InfoSec' : 'InfoSec owner'} value={client.infosecOwnerId} />
                 </div>
@@ -492,6 +858,62 @@ export function Client360Page() {
                   <Detail label={language === 'es' ? 'Excepciones SLA' : 'SLA exceptions'} value={overrides.length} />
                   <Detail label={language === 'es' ? 'Inventario' : 'Inventory'} value={inventory.length} />
                 </div>
+              </div>
+
+              <div className="r360-card r360-section r360-dir-overview">
+                <div className="r360-section-head">
+                  <h2>{language === 'es' ? 'Directorio' : 'Directory'}</h2>
+                  {canManageDirectory && (
+                    <button className="r360-btn" onClick={() => goToTab('directory')}>
+                      {language === 'es' ? 'Gestionar' : 'Manage'}
+                    </button>
+                  )}
+                </div>
+
+                {overviewNotice && <div className="r360-success">{overviewNotice}</div>}
+
+                {client.directory ? (
+                  <div className="r360-dir-view">
+                    <div className="r360-dir-local">
+                      <div>
+                        <div className="r360-muted">
+                          {language === 'es' ? 'Ruta del directorio' : 'Directory path'}
+                        </div>
+                        <code className="r360-mono">{client.directory.localPath}</code>
+                      </div>
+                      <button className="r360-btn" onClick={() => copyOverviewPath(client.directory.localPath)}>
+                        {language === 'es' ? 'Copiar ruta' : 'Copy path'}
+                      </button>
+                    </div>
+
+                    <div className="r360-dir-hint">
+                      {language === 'es'
+                        ? 'Para abrirlo en Windows: Win+E, Ctrl+L y pega la ruta copiada.'
+                        : 'To open it in Windows: Win+E, Ctrl+L and paste the copied path.'}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="r360-dir-overview-empty">
+                    <EmptyState
+                      icon="📁"
+                      title={language === 'es' ? 'Sin directorio guardado' : 'No directory saved'}
+                      text={
+                        canManageDirectory
+                          ? (language === 'es'
+                              ? 'Guarda la ruta del directorio del cliente para copiarla desde aquí.'
+                              : 'Save the client directory path to copy it from here.')
+                          : (language === 'es'
+                              ? 'El cliente todavía no tiene un directorio guardado.'
+                              : 'This client does not have a directory saved yet.')
+                      }
+                    />
+                    {canManageDirectory && (
+                      <button className="r360-btn r360-btn-primary" onClick={() => goToTab('directory')}>
+                        {language === 'es' ? 'Añadir directorio' : 'Add directory'}
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -929,6 +1351,94 @@ export function Client360Page() {
               <button className="r360-btn" onClick={addInventoryItem}>
                 + {language === 'es' ? 'Añadir elemento' : 'Add item'}
               </button>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'directory' && (
+          <div className="r360-card r360-section">
+            <div className="r360-section-head">
+              <h2>{language === 'es' ? 'Directorio' : 'Directory'}</h2>
+              {canManageDirectory && !dirEditing && (
+                <div className="r360-inline-group">
+                  <button className="r360-btn" onClick={startEditDirectory}>
+                    {client.directory
+                      ? (language === 'es' ? 'Editar' : 'Edit')
+                      : (language === 'es' ? 'Añadir directorio' : 'Add directory')}
+                  </button>
+                  {client.directory && (
+                    <button className="r360-btn r360-btn-danger" disabled={dirBusy} onClick={removeDirectory}>
+                      {language === 'es' ? 'Quitar' : 'Remove'}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {dirNotice && <div className="r360-success">{dirNotice}</div>}
+
+            {dirEditing ? (
+              <div className="r360-dir-form">
+                <label className="r360-dir-label" htmlFor="client-directory-path">
+                  {language === 'es' ? 'Ruta del directorio' : 'Directory path'}
+                </label>
+                <input
+                  id="client-directory-path"
+                  placeholder={'C:\\Users\\...\\carpeta'}
+                  value={dirForm.localPath}
+                  onChange={(event) => setDirForm({ localPath: event.target.value })}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' && !dirBusy) saveDirectory();
+                  }}
+                />
+                <div className="r360-dir-hint">
+                  {language === 'es'
+                    ? 'Pega la ruta de Windows tal como la copias del Explorador (C:\\... o \\\\servidor\\...).'
+                    : 'Paste the Windows path exactly as copied from Explorer (C:\\... or \\\\server\\...).'}
+                </div>
+                <div className="r360-inline-group">
+                  <button
+                    className="r360-btn r360-btn-primary"
+                    disabled={dirBusy || !dirForm.localPath.trim()}
+                    onClick={saveDirectory}
+                  >
+                    {language === 'es' ? 'Guardar' : 'Save'}
+                  </button>
+                  <button className="r360-btn" disabled={dirBusy} onClick={() => setDirEditing(false)}>
+                    {language === 'es' ? 'Cancelar' : 'Cancel'}
+                  </button>
+                </div>
+              </div>
+            ) : client.directory ? (
+              <div className="r360-dir-view">
+                <div className="r360-dir-local">
+                  <div>
+                    <div className="r360-muted">
+                      {language === 'es' ? 'Ruta del directorio' : 'Directory path'}
+                    </div>
+                    <code className="r360-mono">{client.directory.localPath}</code>
+                  </div>
+                  <button className="r360-btn" onClick={() => copyDirectoryPath(client.directory.localPath)}>
+                    {language === 'es' ? 'Copiar ruta' : 'Copy path'}
+                  </button>
+                </div>
+
+                <div className="r360-dir-hint">
+                  {language === 'es'
+                    ? 'Para abrirlo en Windows: Win+E, Ctrl+L y pega la ruta copiada.'
+                    : 'To open it in Windows: Win+E, Ctrl+L and paste the copied path.'}
+                </div>
+              </div>
+            ) : (
+              <EmptyState
+                icon="📁"
+                title={language === 'es' ? 'Sin directorio guardado' : 'No directory saved'}
+                text={
+                  language === 'es'
+                    ? 'Guarda la ruta del directorio del cliente para copiarla desde aquí.'
+                    : 'Save the client directory path to copy it from here.'
+                }
+              />
             )}
           </div>
         )}

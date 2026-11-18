@@ -50,11 +50,20 @@ async function syncClientContractFields(clientId: string) {
     Contract.findOne({ clientId }).sort({ createdAt: -1 }).lean(),
     Contract.findOne({ clientId, status: 'active' }).sort({ startDate: -1, createdAt: -1 }).lean(),
   ]);
-  await Client.findByIdAndUpdate(clientId, {
-    contractSigned: Boolean(active),
-    contractType: (active || latest)?.contractType || null,
-    serviceModel: (active || latest)?.serviceModel || null,
-  });
+
+  const source: any = active || latest;
+  if (!source) {
+    // No contract data at all: keep any manually maintained contract fields.
+    return;
+  }
+
+  const update: Record<string, any> = { contractSigned: Boolean(active) };
+  // Contract data wins when present, but missing values must not erase
+  // manually maintained client attributes.
+  if (source.contractType) update.contractType = source.contractType;
+  if (source.serviceModel) update.serviceModel = source.serviceModel;
+
+  await Client.findByIdAndUpdate(clientId, update);
 }
 
 async function findContract(id: string) {

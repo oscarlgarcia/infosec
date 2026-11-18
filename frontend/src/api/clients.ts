@@ -18,6 +18,14 @@ export const clientsApi = {
     return apiRequest<Client>(`/clients/${id}`, { method: 'PUT', json: payload });
   },
 
+  saveDirectory(id: string, payload: { localPath: string }) {
+    return apiRequest<Client>(`/clients/${id}/directory`, { method: 'PUT', json: payload });
+  },
+
+  deleteDirectory(id: string) {
+    return apiRequest<Client>(`/clients/${id}/directory`, { method: 'DELETE' });
+  },
+
   requests(id: string) {
     return apiRequest<any[]>(`/clients/${id}/requests`);
   },

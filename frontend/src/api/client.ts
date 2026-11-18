@@ -80,8 +80,12 @@ export async function apiRequest<T = any>(path: string, options: RequestOptions 
     : await response.text();
 
   if (!response.ok) {
-    const errorBody = parsed && typeof parsed === 'object' ? (parsed.error || parsed) : null;
+    const parsedObject = parsed && typeof parsed === 'object' ? (parsed as any) : null;
+    const rawError = parsedObject?.error;
+    const errorBody =
+      rawError && typeof rawError === 'object' ? rawError : parsedObject;
     const message =
+      (typeof rawError === 'string' ? rawError : undefined) ||
       errorBody?.message ||
       (typeof parsed === 'string' && parsed) ||
       `Request failed with status ${response.status}`;
@@ -97,10 +101,34 @@ export async function apiRequest<T = any>(path: string, options: RequestOptions 
 
 /** Downloads an authenticated file and triggers a browser save. */
 export async function apiDownload(path: string, filename: string): Promise<void> {
-  const headers = new Headers();
+  return apiDownloadRequest(path, filename);
+}
+
+/**
+ * Authenticated binary download with the same options as `apiRequest`.
+ * Used for POST endpoints that return a file (for example a ZIP).
+ */
+export async function apiDownloadRequest(
+  path: string,
+  filename: string,
+  options: RequestOptions = {}
+): Promise<void> {
+  const { json, query, body, ...rest } = options;
+  const headers = new Headers(rest.headers);
   const token = getAccessToken();
   if (token) headers.set('Authorization', `Bearer ${token}`);
-  const response = await fetch(resolveUrl(path), { headers });
+
+  let payload: BodyInit | null | undefined = body;
+  if (json !== undefined) {
+    headers.set('Content-Type', 'application/json');
+    payload = JSON.stringify(json);
+  }
+
+  const response = await fetch(resolveUrl(path, query), {
+    ...rest,
+    headers,
+    body: payload,
+  });
   if (!response.ok) {
     throw new ApiError(`Download failed with status ${response.status}`, response.status);
   }

@@ -14,6 +14,8 @@ import {
   findPossibleDuplicates,
   softDeleteRequest,
   restoreRequest,
+  saveRequestDirectory,
+  deleteRequestDirectory,
   RequestActor,
 } from '../services/request/request.service';
 import { listEvents, logEvent } from '../services/request/event.service';
@@ -67,6 +69,7 @@ import {
   updateThreadSchema,
   ValidationError,
 } from '../schemas/request';
+import { directoryLinkSchema } from '../schemas/client';
 
 type Json = Record<string, any>;
 
@@ -251,6 +254,51 @@ export async function requestRoutes(fastify: FastifyInstance) {
       return replyError(reply, error);
     }
   });
+
+  // Request-level directory (optional override of the client directory).
+  fastify.put<{ Params: { id: string } }>(
+    '/requests/:id/directory',
+    { preHandler: [verifyToken, requireRole('admin', 'manager')] },
+    async (request, reply) => {
+      try {
+        const parsed = directoryLinkSchema.safeParse(request.body);
+        if (!parsed.success) {
+          request.log.warn(
+            { requestId: request.params.id, fieldErrors: parsed.error.flatten().fieldErrors },
+            'Invalid directory path'
+          );
+          return reply.code(400).send({
+            error: 'Invalid directory path',
+            details: parsed.error.flatten(),
+          });
+        }
+        const actor = request.user?.username || request.user?.email || request.user?.id;
+        const updated = await saveRequestDirectory(
+          request.params.id,
+          { localPath: parsed.data.localPath },
+          actor
+        );
+        if (!updated) return reply.code(404).send({ error: 'Request not found' });
+        return updated;
+      } catch (error) {
+        return replyError(reply, error);
+      }
+    }
+  );
+
+  fastify.delete<{ Params: { id: string } }>(
+    '/requests/:id/directory',
+    { preHandler: [verifyToken, requireRole('admin', 'manager')] },
+    async (request, reply) => {
+      try {
+        const updated = await deleteRequestDirectory(request.params.id);
+        if (!updated) return reply.code(404).send({ error: 'Request not found' });
+        return updated;
+      } catch (error) {
+        return replyError(reply, error);
+      }
+    }
+  );
 
   fastify.post<{ Params: { id: string } }>('/requests/:id/status', { preHandler: [verifyToken, requireRole('admin', 'manager', 'sme')] }, async (request, reply) => {
     try {

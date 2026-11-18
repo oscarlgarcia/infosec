@@ -151,6 +151,13 @@ export interface RequestAttachment {
   createdAt?: string;
 }
 
+export interface DirectoryLink {
+  localPath: string;
+  addedBy?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface RequestClientSummary {
   id: string;
   name: string;
@@ -158,6 +165,7 @@ export interface RequestClientSummary {
   country?: string;
   customerStatus?: string;
   currentPhase?: string;
+  directory?: DirectoryLink;
 }
 
 export interface Request360 {
@@ -206,6 +214,7 @@ export interface Request360 {
   duplicateOf?: string;
   mergedInto?: string;
   attachments: RequestAttachment[];
+  directory?: DirectoryLink;
   createdBy?: string;
   updatedBy?: string;
   createdAt: string;

@@ -1,4 +1,4 @@
-import type { TechnologyInventoryItem } from './request360';
+import type { DirectoryLink, TechnologyInventoryItem } from './request360';
 
 export interface Client {
   id: string;
@@ -18,6 +18,7 @@ export interface Client {
   salesOwnerId?: string;
   clientOwnerId?: string;
   infosecOwnerId?: string;
+  directory?: DirectoryLink;
   stakeholders?: any[];
   cveSubscriptions?: any;
   createdAt: string;

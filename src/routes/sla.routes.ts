@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { verifyToken, requireRole } from '../middleware/auth';
 import { BusinessCalendar, ClientSlaOverride, Setting, SlaPolicy } from '../db/mongo/models';
 import { ContractTypes, ServiceModels } from '../types/request';
+import { DefaultEvidenceDomains, DefaultEvidenceFrameworks } from '../types/evidence';
 import {
   businessCalendarSchema,
   clientSlaOverrideSchema,
@@ -13,6 +14,8 @@ import { ensureDefaultSlaConfiguration, runSlaSweep } from '../services/request/
 const CATALOG_KEYS = {
   contractTypes: 'catalog:contractTypes',
   serviceModels: 'catalog:serviceModels',
+  evidenceDomains: 'catalog:evidenceDomains',
+  evidenceFrameworks: 'catalog:evidenceFrameworks',
 };
 
 async function getCatalog(key: string, fallback: readonly string[]) {
@@ -145,6 +148,8 @@ export async function slaRoutes(fastify: FastifyInstance) {
     return {
       contractTypes: await getCatalog(CATALOG_KEYS.contractTypes, ContractTypes),
       serviceModels: await getCatalog(CATALOG_KEYS.serviceModels, ServiceModels),
+      evidenceDomains: await getCatalog(CATALOG_KEYS.evidenceDomains, DefaultEvidenceDomains),
+      evidenceFrameworks: await getCatalog(CATALOG_KEYS.evidenceFrameworks, DefaultEvidenceFrameworks),
     };
   });
 
